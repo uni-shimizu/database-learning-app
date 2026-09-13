@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>関係データベース・SQL体験学習</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- sql.js (WebAssembly SQLite) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Yu Gothic', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+    }
+    .code-font {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+    }
+    /* テーブルのスクロールバー美化 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    
+    /* STREAMING_CHUNK:Styling key badges for database visualization... -->
+    .key-badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+    .badge-pk {
+      background-color: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fca5a5;
+    }
+    .badge-fk {
+      background-color: #e0e7ff;
+      color: #3730a3;
+      border: 1px solid #a5b4fc;
+    }
+  </style>
+
+  <style>
+    /* 授業用：情報量を抑え、読みやすさを優先する調整 */
+    body {
+      background: #f8fafc;
+      line-height: 1.7;
+    }
+    .text-xs {
+      font-size: 0.875rem !important;
+      line-height: 1.45rem !important;
+    }
+    .text-\[11px\], .text-\[10px\] {
+      font-size: 0.8rem !important;
+      line-height: 1.25rem !important;
+    }
+    #stepContentArea h2 {
+      font-size: 1.15rem !important;
+      line-height: 1.7rem !important;
+    }
+    #stepContentArea textarea {
+      font-size: 1rem !important;
+      line-height: 1.7rem !important;
+    }
+    button {
+      min-height: 40px;
+    }
+    .badge-pk {
+      background-color: #f1f5f9;
+      color: #334155;
+      border-color: #cbd5e1;
+    }
+    .badge-fk {
+      background-color: #eff6ff;
+      color: #1d4ed8;
+      border-color: #bfdbfe;
+    }
+    @media (max-width: 640px) {
+      header .h-16 { height: auto; min-height: 4rem; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow">
+          DB
+        </div>
+        <div>
+          <h1 class="text-base sm:text-lg font-bold text-slate-900 leading-tight">関係データベース・SQL体験学習</h1>
+          <p class="text-xs text-slate-500 hidden sm:block">高校「情報I」 / 射影・選択・結合を体験</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-3">
+        <div class="bg-slate-100 border border-slate-200 rounded-full px-3 py-1 flex items-center space-x-2">
+          <span class="text-xs font-semibold text-slate-500">進捗</span>
+          <span id="stepProgressIndicator" class="text-xs font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-full shadow-sm">
+            STEP 1 / 5
+          </span>
+        </div>
+        <button id="btnResetAll" class="text-xs font-medium text-slate-600 hover:text-red-600 bg-white hover:bg-red-50 border border-slate-300 hover:border-red-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          最初からやり直す
+        </button>
+      </div>
+    </div>
+    
+    <div class="w-full bg-slate-200 h-1">
+      <div id="progressBar" class="bg-indigo-600 h-1 transition-all duration-300" style="width: 20%;"></div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col gap-5">
+
+    <section class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm">
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        
+        <!-- 1. やること -->
+        <div class="flex flex-col border-l-4 border-indigo-500 pl-3">
+          <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">① やること</span>
+          <p id="guideAction" class="text-sm font-semibold text-slate-800 mt-1 leading-snug">
+            読み込み中...
+          </p>
+        </div>
+        
+        <!-- 2. 使用するSQL・ヒント -->
+        <div class="flex flex-col border-l-4 border-slate-300 pl-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-600">② 使用するSQL・ヒント</span>
+            <button id="btnToggleHint" class="text-xs text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded font-medium transition">
+              ヒントを見る
+            </button>
+          </div>
+          <p id="guideHint" class="text-xs text-slate-600 mt-1 leading-snug">
+            -
+          </p>
+        </div>
+        
+        <!-- 3. 成功条件 -->
+        <div class="flex flex-col border-l-4 border-slate-300 pl-3">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-600">③ 成功条件</span>
+          <p id="guideSuccess" class="text-xs text-slate-700 mt-1 leading-snug">
+            -
+          </p>
+        </div>
+        
+        <!-- 4. 終わったら何をするか -->
+        <div class="flex flex-col border-l-4 border-slate-300 pl-3">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-600">④ 終わったら何をするか</span>
+          <p id="guideNext" class="text-xs text-slate-700 mt-1 leading-snug">
+            -
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEPごとの動的コンテンツ表示コンテナ -->
+    <div id="stepContentArea" class="space-y-5">
+      <!-- JSでSTEP 1 ~ 5 のコンテンツを挿入 -->
+    </div>
+
+  </main>
+
+  <div id="customModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full mx-4 p-6 shadow-2xl border border-slate-200 transform transition-all scale-95 opacity-0 duration-150" id="modalBox">
+      <div class="flex items-center space-x-3 mb-3">
+        <div id="modalIcon" class="w-10 h-10 rounded-full flex items-center justify-center bg-amber-100 text-amber-600 font-bold">
+          !
+        </div>
+        <h3 id="modalTitle" class="text-base font-bold text-slate-900">確認</h3>
+      </div>
+      <p id="modalMessage" class="text-sm text-slate-600 mb-5 leading-relaxed"></p>
+      <div class="flex justify-end">
+        <button id="modalConfirmBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition">
+          OK
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="text-center text-xs text-slate-400 py-4 border-t border-slate-200 bg-white">
+    高校「情報I」データベース学習アプリ
+  </footer>
+
+  <script>
+    const appState = {
+      currentStep: 1,
+      totalSteps: 5,
+      db: null,
+      sqlJsLoaded: false,
+      stepSuccess: [false, false, false, false, false, false], // 1-indexed
+    };
+
+    // 初期化用DDL・DML
+    const INITIAL_SQL = `
+      -- 生徒表
+      CREATE TABLE students (
+        student_id TEXT PRIMARY KEY,
+        student_name TEXT,
+        class TEXT
+      );
+      INSERT INTO students VALUES ('S01', '佐藤', '2A');
+      INSERT INTO students VALUES ('S02', '鈴木', '2A');
+      INSERT INTO students VALUES ('S03', '高橋', '2B');
+      INSERT INTO students VALUES ('S04', '伊藤', '2B');
+
+      -- 書籍表
+      CREATE TABLE books (
+        book_id TEXT PRIMARY KEY,
+        title TEXT,
+        author TEXT
+      );
+      INSERT INTO books VALUES ('B01', 'データベース入門', '山田');
+      INSERT INTO books VALUES ('B02', 'SQL入門', '田中');
+      INSERT INTO books VALUES ('B03', '情報システム基礎', '佐々木');
+
+      -- 貸出表
+      CREATE TABLE loans (
+        loan_id INTEGER PRIMARY KEY,
+        student_id TEXT,
+        book_id TEXT,
+        loan_date TEXT,
+        FOREIGN KEY (student_id) REFERENCES students(student_id),
+        FOREIGN KEY (book_id) REFERENCES books(book_id)
+      );
+      INSERT INTO loans VALUES (1, 'S01', 'B02', '2026-06-01');
+      INSERT INTO loans VALUES (2, 'S02', 'B01', '2026-06-02');
+      INSERT INTO loans VALUES (3, 'S03', 'B02', '2026-06-03');
+      INSERT INTO loans VALUES (4, 'S01', 'B03', '2026-06-04');
+      INSERT INTO loans VALUES (5, 'S04', 'B01', '2026-06-05');
+      INSERT INTO loans VALUES (6, 'S02', 'B03', '2026-06-06');
+    `;
+
+    const STEP_GUIDES = {
+      1: {
+        action: "未正規化の表を見て、同じデータを重複して持っている問題点（クイズ）に答えましょう。",
+        hint: "佐藤さんの貸出履歴が何件あるか探してみましょう。",
+        detailHint: "ヒント：表の中で「佐藤」さんは貸出ID 1 と 貸出ID 4 の2行に登場しています。クラスを変えるにはどうすればいいでしょうか？",
+        success: "クイズで正しい選択肢を選んで「回答する」を押す。",
+        next: "正解の解説を読み、画面右下の「STEP 2 へ進む」ボタンをクリックしてください。"
+      },
+      2: {
+        action: "3つの表（students, books, loans）がどのように関連しているかを確認しましょう。",
+        hint: "共通のキー（student_id と book_id）に注目してください。",
+        detailHint: "ヒント：loans表（貸出）には生徒名ではなく『student_id』だけが入っています。これにより、生徒の名前やクラスが変わってもstudents表を1箇所変更するだけで済みます。",
+        success: "確認問題で正解し、student_id が表をつなぐキーだと確認する。",
+        next: "確認問題に正解すると「STEP 3（射影）へ進む」ボタンが表示されます。"
+      },
+      
+      3: {
+        action: "students表から『生徒名（student_name）』の列だけを取り出すSQLを入力・実行しましょう。",
+        hint: "SELECT 列名 FROM 表名; の形式を使います。",
+        detailHint: "ヒント：SELECTの後ろには、表示したい列名を書きます。\n正解のSQL:\nSELECT student_name\nFROM students;",
+        success: "結果が4行で、student_name列のみが表示されること。",
+        next: "成功メッセージを確認し、「STEP 4（選択）へ進む」をクリックしてください。"
+      },
+      4: {
+        action: "2Aクラスの生徒だけを絞り込むSQLを入力して実行しましょう。",
+        hint: "WHERE class = '2A' を使って行を限定します。",
+        detailHint: "ヒント：WHEREは条件に合う行だけを取り出すときに使います。文字列は '2A' のようにシングルクォーテーションで囲みます。\n正解のSQL:\nSELECT student_name, class\nFROM students\nWHERE class = '2A';",
+        success: "結果が佐藤・鈴木の2件だけ抽出されること。",
+        next: "「射影」と「選択」の違いを理解したら、「STEP 5（結合）へ進む」をクリックしてください。"
+      },
+      5: {
+        action: "「誰がどの本を借りたか」を表示するため、3つの表をJOINで結合するSQLを実行しましょう。",
+        hint: "提示されている完成例SQLを実行してみましょう。",
+        detailHint: "ヒント：完成例のSQLをコピーして実行するだけでOKです！ON句で loans.student_id = students.student_id のように共通のIDを結びつけています。",
+        success: "生徒名（student_name）と書籍名（title）のペアが6件表示されること。",
+        next: "学習完了です！お疲れ様でした。必要に応じて「最初からやり直す」で復習できます。"
+      }
+    };
+
+    function showModal(title, message, isAlert = true) {
+      const modal = document.getElementById('customModal');
+      const modalBox = document.getElementById('modalBox');
+      const titleEl = document.getElementById('modalTitle');
+      const msgEl = document.getElementById('modalMessage');
+      const iconEl = document.getElementById('modalIcon');
+
+      titleEl.innerText = title;
+      msgEl.innerText = message;
+
+      if (isAlert) {
+        iconEl.className = "w-10 h-10 rounded-full flex items-center justify-center bg-red-100 text-red-600 font-bold";
+        iconEl.innerHTML = `✕`;
+      } else {
+        iconEl.className = "w-10 h-10 rounded-full flex items-center justify-center bg-indigo-100 text-indigo-600 font-bold";
+        iconEl.innerHTML = `✓`;
+      }
+
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        modalBox.classList.remove('scale-95', 'opacity-0');
+        modalBox.classList.add('scale-100', 'opacity-100');
+      }, 10);
+    }
+
+    document.getElementById('modalConfirmBtn').addEventListener('click', () => {
+      const modal = document.getElementById('customModal');
+      const modalBox = document.getElementById('modalBox');
+      modalBox.classList.remove('scale-100', 'opacity-100');
+      modalBox.classList.add('scale-95', 'opacity-0');
+      setTimeout(() => {
+        modal.classList.add('hidden');
+      }, 150);
+    });
+
+    async function initDatabase() {
+      try {
+        const config = {
+          locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
+        };
+        const SQL = await initSqlJs(config);
+        appState.db = new SQL.Database();
+        appState.db.run(INITIAL_SQL);
+        appState.sqlJsLoaded = true;
+        console.log("SQLite Engine Ready");
+      } catch (err) {
+        console.error("SQL.js initialization failed:", err);
+        showModal("システムエラー", "SQLエンジンの初期化に失敗しました。インターネット接続を確認してリロードしてください。");
+      }
+    }
+
+    // 安全性バリデーション: SELECT文のみ許可
+    function validateSelectOnly(sql) {
+      // コメントの除去
+      const cleanSql = sql.replace(/--.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '').trim();
+      if (!cleanSql) {
+        return { valid: false, message: "SQLが入力されていません。" };
+      }
+
+      // 危険な更新系キーワードの検出（単語境界マッチ）
+      const forbiddenPatterns = [
+        /\bINSERT\b/i,
+        /\bUPDATE\b/i,
+        /\bDELETE\b/i,
+        /\bDROP\b/i,
+        /\bALTER\b/i,
+        /\bCREATE\b/i,
+        /\bTRUNCATE\b/i,
+        /\bREPLACE\b/i,
+        /\bATTACH\b/i,
+        /\bPRAGMA\b/i
+      ];
+
+      for (let pattern of forbiddenPatterns) {
+        if (pattern.test(cleanSql)) {
+          return {
+            valid: false,
+            message: "この教材ではSELECT文だけを使用します。"
+          };
+        }
+      }
+      
+      // 先頭がSELECTまたはWITHで始まっているか
+      if (!/^(SELECT|WITH)\b/i.test(cleanSql)) {
+        return {
+          valid: false,
+          message: "この教材ではSELECT文だけを使用します。"
+        };
+      }
+
+      return { valid: true };
+    }
+
+    function renderTablePreview(tableName, title, badgeColor = "bg-indigo-50 border-indigo-200 text-indigo-800") {
+      if (!appState.db) return '';
+      const res = appState.db.exec(`SELECT * FROM ${tableName}`);
+      if (res.length === 0) return '<div class="text-xs text-slate-400">データがありません</div>';
+
+      const columns = res[0].columns;
+      const values = res[0].values;
+
+      let html = `
+        <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+          <div class="px-3 py-2 border-b border-slate-100 flex items-center justify-between ${badgeColor}">
+            <span class="font-bold text-xs uppercase tracking-wide code-font">${title}</span>
+            <span class="text-[10px] text-slate-500 font-medium">${values.length} 件</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-700">
+              <thead class="bg-slate-50 text-[11px] text-slate-500 border-b border-slate-200">
+                <tr>
+      `;
+      
+      html += columns.map(c => {
+                    let badge = '';
+                    if (c.endsWith('_id') && c.startsWith(tableName.slice(0, 3))) {
+                      badge = '<span class="key-badge badge-pk ml-1">PK</span>';
+                    } else if (c.endsWith('_id')) {
+                      badge = '<span class="key-badge badge-fk ml-1">FK</span>';
+                    }
+                    return `<th class="px-3 py-2 font-semibold code-font whitespace-nowrap">${c}${badge}</th>`;
+                  }).join('');
+                  
+      html += `
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                ${values.map(row => `
+                  <tr class="hover:bg-slate-50/80 transition-colors">
+                    ${row.map(val => `<td class="px-3 py-1.5 whitespace-nowrap">${val}</td>`).join('')}
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+      return html;
+    }
+
+    function updateGuides(step) {
+      const g = STEP_GUIDES[step];
+      document.getElementById('guideAction').innerText = g.action;
+      document.getElementById('guideHint').innerText = g.hint;
+      document.getElementById('guideSuccess').innerText = g.success;
+      document.getElementById('guideNext').innerText = g.next;
+
+      document.getElementById('stepProgressIndicator').innerText = `STEP ${step} / ${appState.totalSteps}`;
+      document.getElementById('progressBar').style.width = `${(step / appState.totalSteps) * 100}%`;
+    }
+
+    // ヒント開閉
+    document.getElementById('btnToggleHint').addEventListener('click', () => {
+      const g = STEP_GUIDES[appState.currentStep];
+      showModal("ヒント", g.detailHint, false);
+    });
+
+    function renderStep1() {
+      const container = document.getElementById('stepContentArea');
+      container.innerHTML = `
+        <div class="space-y-6">
+          <!-- 課題提示カード -->
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded-md">状況説明</span>
+              <h2 class="text-base font-bold text-slate-900">1枚の巨大な表にすべてのデータを詰め込んだ場合</h2>
+            </div>
+            <p class="text-sm text-slate-600 mb-4 leading-relaxed">
+              図書室の貸出データを1枚の大きな表に記録しています。
+              生徒情報（氏名・クラス）と書籍情報（書籍名・著者）が、本を借りるたびに何回も繰り返し記録されています。
+            </p>
+
+            <!-- 1枚の非正規化表：情報を5列に整理して読みやすく表示 -->
+            <div class="overflow-x-auto border border-slate-200 rounded-xl bg-white mb-5">
+              <table class="w-full min-w-[760px] text-left text-sm border-collapse">
+                <thead>
+                  <tr class="bg-slate-100 text-slate-700 font-bold border-b-2 border-slate-300">
+                    <th class="px-4 py-3 w-20">貸出ID</th>
+                    <th class="px-4 py-3 w-40">生徒</th>
+                    <th class="px-4 py-3 w-24">クラス</th>
+                    <th class="px-4 py-3">書籍</th>
+                    <th class="px-4 py-3 w-36">貸出日</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 bg-white">
+                  <tr class="bg-blue-50/60">
+                    <td class="px-4 py-3 font-semibold text-slate-600">1</td>
+                    <td class="px-4 py-3">
+                      <div class="font-bold text-blue-900">佐藤</div>
+                      <div class="text-xs text-slate-500 font-mono mt-0.5">S01</div>
+                    </td>
+                    <td class="px-4 py-3"><span class="inline-flex rounded-md bg-blue-100 px-2.5 py-1 font-bold text-blue-900">2A</span></td>
+                    <td class="px-4 py-3">
+                      <div class="font-semibold text-slate-900">SQL入門</div>
+                      <div class="text-xs text-slate-500 mt-0.5"><span class="font-mono">B02</span> ・ 著者：田中</div>
+                    </td>
+                    <td class="px-4 py-3 text-slate-600 whitespace-nowrap">2026-06-01</td>
+                  </tr>
+                  <tr>
+                    <td class="px-4 py-3 font-semibold text-slate-600">2</td>
+                    <td class="px-4 py-3">
+                      <div class="font-bold text-slate-900">鈴木</div>
+                      <div class="text-xs text-slate-500 font-mono mt-0.5">S02</div>
+                    </td>
+                    <td class="px-4 py-3"><span class="inline-flex rounded-md bg-slate-100 px-2.5 py-1 font-bold text-slate-700">2A</span></td>
+                    <td class="px-4 py-3">
+                      <div class="font-semibold text-slate-900">データベース入門</div>
+                      <div class="text-xs text-slate-500 mt-0.5"><span class="font-mono">B01</span> ・ 著者：山田</div>
+                    </td>
+                    <td class="px-4 py-3 text-slate-600 whitespace-nowrap">2026-06-02</td>
+                  </tr>
+                  <tr>
+                    <td class="px-4 py-3 font-semibold text-slate-600">3</td>
+                    <td class="px-4 py-3">
+                      <div class="font-bold text-slate-900">高橋</div>
+                      <div class="text-xs text-slate-500 font-mono mt-0.5">S03</div>
+                    </td>
+                    <td class="px-4 py-3"><span class="inline-flex rounded-md bg-slate-100 px-2.5 py-1 font-bold text-slate-700">2B</span></td>
+                    <td class="px-4 py-3">
+                      <div class="font-semibold text-slate-900">SQL入門</div>
+                      <div class="text-xs text-slate-500 mt-0.5"><span class="font-mono">B02</span> ・ 著者：田中</div>
+                    </td>
+                    <td class="px-4 py-3 text-slate-600 whitespace-nowrap">2026-06-03</td>
+                  </tr>
+                  <tr class="bg-blue-50/60">
+                    <td class="px-4 py-3 font-semibold text-slate-600">4</td>
+                    <td class="px-4 py-3">
+                      <div class="font-bold text-blue-900">佐藤</div>
+                      <div class="text-xs text-slate-500 font-mono mt-0.5">S01</div>
+                    </td>
+                    <td class="px-4 py-3"><span class="inline-flex rounded-md bg-blue-100 px-2.5 py-1 font-bold text-blue-900">2A</span></td>
+                    <td class="px-4 py-3">
+                      <div class="font-semibold text-slate-900">情報システム基礎</div>
+                      <div class="text-xs text-slate-500 mt-0.5"><span class="font-mono">B03</span> ・ 著者：佐々木</div>
+                    </td>
+                    <td class="px-4 py-3 text-slate-600 whitespace-nowrap">2026-06-04</td>
+                  </tr>
+                  <tr>
+                    <td class="px-4 py-3 font-semibold text-slate-600">5</td>
+                    <td class="px-4 py-3">
+                      <div class="font-bold text-slate-900">伊藤</div>
+                      <div class="text-xs text-slate-500 font-mono mt-0.5">S04</div>
+                    </td>
+                    <td class="px-4 py-3"><span class="inline-flex rounded-md bg-slate-100 px-2.5 py-1 font-bold text-slate-700">2B</span></td>
+                    <td class="px-4 py-3">
+                      <div class="font-semibold text-slate-900">データベース入門</div>
+                      <div class="text-xs text-slate-500 mt-0.5"><span class="font-mono">B01</span> ・ 著者：山田</div>
+                    </td>
+                    <td class="px-4 py-3 text-slate-600 whitespace-nowrap">2026-06-05</td>
+                  </tr>
+                  <tr>
+                    <td class="px-4 py-3 font-semibold text-slate-600">6</td>
+                    <td class="px-4 py-3">
+                      <div class="font-bold text-slate-900">鈴木</div>
+                      <div class="text-xs text-slate-500 font-mono mt-0.5">S02</div>
+                    </td>
+                    <td class="px-4 py-3"><span class="inline-flex rounded-md bg-slate-100 px-2.5 py-1 font-bold text-slate-700">2A</span></td>
+                    <td class="px-4 py-3">
+                      <div class="font-semibold text-slate-900">情報システム基礎</div>
+                      <div class="text-xs text-slate-500 mt-0.5"><span class="font-mono">B03</span> ・ 著者：佐々木</div>
+                    </td>
+                    <td class="px-4 py-3 text-slate-600 whitespace-nowrap">2026-06-06</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- クイズセクション -->
+            <div class="bg-indigo-50/70 border border-indigo-100 rounded-xl p-5">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-xs font-bold uppercase bg-indigo-600 text-white px-2 py-0.5 rounded">QUESTION</span>
+                <p class="text-sm font-bold text-slate-900">
+                  「佐藤さんのクラスが2Aから2Bに変わりました。何か所変更する必要がありますか？」
+                </p>
+              </div>
+              <p class="text-xs text-slate-600 mb-4">
+                上の表を見て、佐藤さんのクラスが書かれている行数を数えてみましょう。
+              </p>
+      `;
+
+      container.innerHTML += `
+              <div class="flex flex-wrap gap-3 mb-4">
+                <label class="flex items-center gap-2 bg-white border border-slate-300 rounded-xl px-4 py-2 text-sm cursor-pointer hover:border-indigo-500 transition">
+                  <input type="radio" name="quizStep1" value="1" class="text-indigo-600 focus:ring-indigo-500">
+                  <span>1か所</span>
+                </label>
+                <label class="flex items-center gap-2 bg-white border border-slate-300 rounded-xl px-4 py-2 text-sm cursor-pointer hover:border-indigo-500 transition">
+                  <input type="radio" name="quizStep1" value="2" class="text-indigo-600 focus:ring-indigo-500">
+                  <span>2か所</span>
+                </label>
+                <label class="flex items-center gap-2 bg-white border border-slate-300 rounded-xl px-4 py-2 text-sm cursor-pointer hover:border-indigo-500 transition">
+                  <input type="radio" name="quizStep1" value="3" class="text-indigo-600 focus:ring-indigo-500">
+                  <span>3か所</span>
+                </label>
+              </div>
+
+              <button id="btnSubmitQuiz1" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow transition">
+                回答する
+              </button>
+            </div>
+
+            <!-- 正解後の解説カード（初期非表示） -->
+            <div id="step1Explanation" class="hidden mt-6 pt-5 border-t border-slate-200 space-y-4">
+              <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-900">
+                <div class="flex items-center gap-2 font-bold text-sm mb-1 text-emerald-800">
+                  <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  正解です！（2か所）
+                </div>
+                <p class="text-xs text-emerald-800 leading-relaxed font-medium">
+                  同じ情報を複数の場所に保存すると、修正漏れが起こる可能性があります。
+                </p>
+                <p class="text-xs text-emerald-800 mt-2 leading-relaxed font-medium">
+                  同じ情報を何度も保存しないよう、データを役割ごとの表に整理することを<strong class="text-emerald-950 font-bold underline decoration-emerald-500 decoration-2">「正規化」</strong>といいます。
+                </p>
+              </div>
+      `;
+
+      container.innerHTML += `
+              <div>
+                <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">▼ 正規化して役割ごとに分けた3つの表</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  ${renderTablePreview('students', 'students (生徒表)')}
+                  ${renderTablePreview('books', 'books (書籍表)')}
+                  ${renderTablePreview('loans', 'loans (貸出表)')}
+                </div>
+              </div>
+
+              <div class="flex justify-end pt-2">
+                <button id="btnGotoStep2" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-6 py-2.5 rounded-xl shadow hover:shadow-md transition flex items-center gap-2">
+                  <span>STEP 2 へ進む</span>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      `;
+
+      // イベントリスナー
+      document.getElementById('btnSubmitQuiz1').addEventListener('click', () => {
+        const selected = document.querySelector('input[name="quizStep1"]:checked');
+        if (!selected) {
+          showModal("未選択", "選択肢を1つ選んでから回答ボタンを押してください。");
+          return;
+        }
+        if (selected.value === "2") {
+          appState.stepSuccess[1] = true;
+          document.getElementById('step1Explanation').classList.remove('hidden');
+          // スムーズスクロール
+          document.getElementById('step1Explanation').scrollIntoView({ behavior: 'smooth' });
+        } else {
+          showModal("おしい！", "佐藤さんは「貸出ID 1」と「貸出ID 4」の2回本を借りています。表の行をよく確認してみましょう。");
+        }
+      });
+
+      const btnNext = document.getElementById('btnGotoStep2');
+      if (btnNext) {
+        btnNext.addEventListener('click', () => changeStep(2));
+      }
+    }
+
+    function renderStep2() {
+      const container = document.getElementById('stepContentArea');
+      container.innerHTML = `
+        <div class="space-y-6">
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="bg-blue-50 text-blue-800 text-xs font-bold px-2.5 py-1 rounded-md">解説</span>
+              <h2 class="text-base font-bold text-slate-900">関係データベースとは？</h2>
+            </div>
+            <p class="text-sm text-slate-700 leading-relaxed mb-6">
+              データを表として管理し、共通するIDなどを使って複数の表を関連付けるデータベースを<strong class="text-indigo-600 font-bold underline decoration-indigo-400">関係データベース</strong>といいます。
+            </p>
+
+            <!-- 視覚的関係図 -->
+            <div class="bg-slate-50 border border-slate-200 rounded-2xl p-5 mb-6">
+              <div class="text-xs font-bold text-slate-500 mb-3 flex items-center justify-between">
+                <span>表同士の関連付け構造（リレーションシップ）</span>
+                <span class="text-[11px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">IDでつなぐ</span>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+      `;
+
+      container.innerHTML += `
+                <!-- students -->
+                <div class="bg-white border border-slate-300 rounded-xl p-3 shadow-xs">
+                  <div class="text-xs font-bold text-blue-700 pb-2 border-b border-slate-200 flex items-center justify-between">
+                    <span>students 表</span>
+                    <span class="text-[10px] bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded font-mono">親表</span>
+                  </div>
+                  <div class="mt-2 space-y-1 text-xs">
+                    <div class="bg-blue-50 border border-blue-200 text-blue-900 font-bold p-1.5 rounded flex items-center justify-between">
+                      <span class="code-font">student_id</span>
+                      <span class="key-badge badge-pk">主キー (PK)</span>
+                    </div>
+                    <div class="p-1.5 text-slate-600 text-[11px] code-font">student_name</div>
+                    <div class="p-1.5 text-slate-600 text-[11px] code-font">class</div>
+                  </div>
+                </div>
+
+                <!-- loans (中心) -->
+                <div class="bg-white border border-slate-300 rounded-xl p-3 shadow-sm relative">
+                  <div class="text-xs font-bold text-blue-700 pb-2 border-b border-slate-200 flex items-center justify-between">
+                    <span>loans 表（貸出の記録）</span>
+                    <span class="text-[10px] bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded font-mono">関連付けの中心</span>
+                  </div>
+                  <div class="mt-2 space-y-1.5 text-xs">
+                    <div class="p-1 text-slate-500 text-[11px] code-font">loan_id <span class="key-badge badge-pk">PK</span></div>
+                    <!-- 外部キー 1 -->
+                    <div class="bg-blue-50 border border-blue-200 text-blue-900 font-bold p-1.5 rounded flex items-center justify-between">
+                      <span class="code-font">student_id</span>
+                      <span class="key-badge badge-fk">外部キー (FK)</span>
+                    </div>
+                    <!-- 外部キー 2 -->
+                    <div class="bg-blue-50 border border-blue-200 text-blue-900 font-bold p-1.5 rounded flex items-center justify-between">
+                      <span class="code-font">book_id</span>
+                      <span class="key-badge badge-fk">外部キー (FK)</span>
+                    </div>
+                    <div class="p-1 text-slate-500 text-[11px] code-font">loan_date</div>
+                  </div>
+                </div>
+      `;
+
+      container.innerHTML += `
+                <!-- books -->
+                <div class="bg-white border border-slate-300 rounded-xl p-3 shadow-xs">
+                  <div class="text-xs font-bold text-blue-700 pb-2 border-b border-slate-200 flex items-center justify-between">
+                    <span>books 表</span>
+                    <span class="text-[10px] bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded font-mono">親表</span>
+                  </div>
+                  <div class="mt-2 space-y-1 text-xs">
+                    <div class="bg-blue-50 border border-blue-200 text-blue-900 font-bold p-1.5 rounded flex items-center justify-between">
+                      <span class="code-font">book_id</span>
+                      <span class="key-badge badge-pk">主キー (PK)</span>
+                    </div>
+                    <div class="p-1.5 text-slate-600 text-[11px] code-font">title</div>
+                    <div class="p-1.5 text-slate-600 text-[11px] code-font">author</div>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- 補足解説テキスト -->
+              <div class="mt-5 p-3 bg-white border border-slate-200 rounded-xl text-xs text-slate-600 space-y-1">
+                <p>💡 <span class="font-bold text-blue-700">student_id</span> と <span class="font-bold text-blue-700">book_id</span> という共通の「目印（キー）」があるおかげで、重複した名前や書名を保存することなく、表同士を確実につなぐことができます。</p>
+              </div>
+            </div>
+
+            <!-- 補助情報：必要なときだけ開く -->
+            <details class="mt-4 border border-slate-200 rounded-xl bg-white">
+              <summary class="cursor-pointer px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 rounded-xl">
+                実際のデータも確認する（必要なときだけ）
+              </summary>
+              <div class="px-4 pb-4 pt-1">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  ${renderTablePreview('students', 'students')}
+                  ${renderTablePreview('books', 'books')}
+                  ${renderTablePreview('loans', 'loans')}
+                </div>
+              </div>
+            </details>
+
+            <!-- STEP2 確認問題：正解しないと次へ進めない -->
+            <div class="mt-5 bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <p class="text-sm font-bold text-slate-900 mb-3">確認：students表とloans表をつなぐ共通のキーはどれですか？</p>
+              <div class="flex flex-wrap gap-2 mb-3">
+                <label class="bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm cursor-pointer hover:border-blue-500">
+                  <input type="radio" name="quizStep2" value="loan_id" class="mr-1"> loan_id
+                </label>
+                <label class="bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm cursor-pointer hover:border-blue-500">
+                  <input type="radio" name="quizStep2" value="student_id" class="mr-1"> student_id
+                </label>
+                <label class="bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm cursor-pointer hover:border-blue-500">
+                  <input type="radio" name="quizStep2" value="title" class="mr-1"> title
+                </label>
+              </div>
+              <button id="btnSubmitQuiz2" class="bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold px-5 py-2 rounded-lg">回答する</button>
+              <div id="step2QuizMessage" class="hidden mt-3 text-sm font-semibold"></div>
+            </div>
+
+            <div id="step2NextArea" class="hidden flex justify-end pt-5">
+              <button id="btnGotoStep3" class="bg-blue-700 hover:bg-blue-800 text-white font-bold text-sm px-6 py-2.5 rounded-xl shadow transition flex items-center gap-2">
+                <span>STEP 3（射影）へ進む</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('btnSubmitQuiz2').addEventListener('click', () => {
+        const selected = document.querySelector('input[name="quizStep2"]:checked');
+        const msg = document.getElementById('step2QuizMessage');
+        if (!selected) {
+          msg.className = "mt-3 text-sm font-semibold text-red-700 block";
+          msg.textContent = "選択肢を1つ選んでください。";
+          return;
+        }
+        if (selected.value === 'student_id') {
+          appState.stepSuccess[2] = true;
+          msg.className = "mt-3 text-sm font-semibold text-emerald-700 block";
+          msg.textContent = "正解です。student_id を使って students表とloans表を関連付けます。";
+          document.getElementById('step2NextArea').classList.remove('hidden');
+        } else {
+          appState.stepSuccess[2] = false;
+          msg.className = "mt-3 text-sm font-semibold text-amber-800 block";
+          msg.textContent = "表の両方にある同じ名前のIDを確認しましょう。";
+          document.getElementById('step2NextArea').classList.add('hidden');
+        }
+      });
+
+      document.getElementById('btnGotoStep3').addEventListener('click', () => changeStep(3));
+    }
+
+    function renderStep3() {
+      const container = document.getElementById('stepContentArea');
+      container.innerHTML = `
+        <div class="space-y-5">
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="bg-indigo-100 text-indigo-800 text-xs font-bold px-2.5 py-1 rounded-md">操作①</span>
+              <h2 class="text-base font-bold text-slate-900">列を取り出す操作：射影（しゃえい）</h2>
+            </div>
+            <p class="text-sm text-slate-700 mb-4">
+              問題：<strong class="text-slate-900 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">students表から生徒名（student_name）だけを表示してください。</strong>
+            </p>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              <!-- 左側：SQL入力エディタ -->
+              <div class="lg:col-span-7 flex flex-col space-y-3">
+                <div class="flex items-center justify-between">
+                  <label for="sqlEditor3" class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <span>SQLエディタ</span>
+                    <span class="text-[10px] text-indigo-600 font-normal">（空欄を埋めてみよう）</span>
+                  </label>
+                  <button id="btnFillStep3" class="text-xs text-slate-500 hover:text-indigo-600 underline">
+                    初期テンプレに戻す
+                  </button>
+                </div>
+
+                <div class="relative">
+                  <textarea id="sqlEditor3" rows="5" class="w-full bg-slate-900 text-emerald-400 code-font text-sm p-4 rounded-xl border border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none transition leading-relaxed resize-none shadow-inner" spellcheck="false">SELECT ________
+FROM students;</textarea>
+                </div>
+      `;
+      
+      container.innerHTML += `
+                <div class="flex items-center justify-between pt-1">
+                  <span class="text-[11px] text-slate-500">※SELECT文のみ実行可能</span>
+                  <button id="btnRunSql3" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2.5 rounded-xl shadow hover:shadow-md transition flex items-center gap-2">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>SQLを実行</span>
+                  </button>
+                </div>
+
+                <!-- 実行メッセージ通知領域 -->
+                <div id="step3Message" class="hidden rounded-xl p-3.5 text-xs font-medium"></div>
+              </div>
+
+              <!-- 右側：参考テーブル -->
+              <div class="lg:col-span-5 space-y-3">
+                <div class="text-xs font-bold text-slate-500">参照：対象の students 表</div>
+                ${renderTablePreview('students', 'students (生徒表)')}
+              </div>
+            </div>
+
+            <!-- 実行結果表示領域 -->
+            <div class="mt-6 pt-5 border-t border-slate-200">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">実行結果</h3>
+                <span id="step3ResultCount" class="text-xs text-slate-500">未実行</span>
+              </div>
+              <div id="step3ResultTable" class="min-h-[90px] bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-center text-xs text-slate-400">
+                「SQLを実行」ボタンを押すとここに結果が表示されます。
+              </div>
+            </div>
+
+            <!-- 次へ進むボタン（初期非表示） -->
+            <div id="step3NextArea" class="hidden flex justify-end pt-5">
+              <button id="btnGotoStep4" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-6 py-2.5 rounded-xl shadow hover:shadow-md transition flex items-center gap-2">
+                <span>STEP 4（選択）へ進む</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // テンプレ戻し
+      document.getElementById('btnFillStep3').addEventListener('click', () => {
+        document.getElementById('sqlEditor3').value = "SELECT ________\nFROM students;";
+      });
+
+      // 実行ロジック
+      document.getElementById('btnRunSql3').addEventListener('click', () => {
+        const sql = document.getElementById('sqlEditor3').value;
+        const msgBox = document.getElementById('step3Message');
+        const resTable = document.getElementById('step3ResultTable');
+        const countSpan = document.getElementById('step3ResultCount');
+        const nextArea = document.getElementById('step3NextArea');
+
+        // SELECT制限チェック
+        const validation = validateSelectOnly(sql);
+        if (!validation.valid) {
+          msgBox.className = "rounded-xl p-3.5 text-xs font-medium bg-red-50 text-red-700 border border-red-200 block";
+          msgBox.innerText = validation.message;
+          resTable.innerHTML = `<span class="text-red-500">${validation.message}</span>`;
+          countSpan.innerText = "エラー";
+          return;
+        }
+
+        try {
+          const res = appState.db.exec(sql);
+          if (res.length === 0) {
+            resTable.innerHTML = `<span class="text-slate-500">0件の結果が返されました。</span>`;
+            countSpan.innerText = "0件";
+            msgBox.className = "rounded-xl p-3.5 text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 block";
+            msgBox.innerText = "データが取得できませんでした。SQLを見直してください。";
+            return;
+          }
+
+          const columns = res[0].columns;
+          const values = res[0].values;
+          countSpan.innerText = `${values.length} 件`;
+
+          // 結果テーブル描画
+          let tableHtml = `
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="bg-indigo-50/70 border-b border-indigo-200 text-indigo-900">
+                  ${columns.map(c => `<th class="p-2 font-bold code-font">${c}</th>`).join('')}
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-200 bg-white">
+                ${values.map(r => `<tr>${r.map(v => `<td class="p-2">${v}</td>`).join('')}</tr>`).join('')}
+              </tbody>
+            </table>
+          `;
+          resTable.innerHTML = `<div class="w-full overflow-x-auto rounded-lg border border-slate-200">${tableHtml}</div>`;
+
+          // 成功判定：student_name 列のみで 4件
+          const normalizedCols = columns.map(c => c.toLowerCase());
+          const isOnlyStudentName = (normalizedCols.length === 1 && normalizedCols[0] === 'student_name');
+          const isFourRows = values.length === 4;
+
+          if (isOnlyStudentName && isFourRows) {
+            msgBox.className = "rounded-xl p-3.5 text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 block";
+            msgBox.innerHTML = `<strong>成功！</strong> 必要な列だけを取り出す操作を<strong>『射影』</strong>といいます。`;
+            appState.stepSuccess[3] = true;
+            nextArea.classList.remove('hidden');
+          } else {
+            msgBox.className = "rounded-xl p-3.5 text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 block";
+            if (!isOnlyStudentName) {
+              msgBox.innerText = "ヒント：生徒名（student_name）の列だけを指定しましょう。他の列が含まれていないか確認してください。";
+            } else {
+              msgBox.innerText = "ヒント：すべての生徒（4名分）が表示されるようにWHERE句を使わず全行抽出してください。";
+            }
+          }
+        } catch (e) {
+          msgBox.className = "rounded-xl p-3.5 text-xs font-medium bg-red-50 text-red-700 border border-red-200 block";
+          msgBox.innerText = `SQLエラー: ${e.message}`;
+          resTable.innerHTML = `<span class="text-red-500">文法に誤りがあります。SELECTの後ろを確認してください。</span>`;
+          countSpan.innerText = "エラー";
+        }
+      });
+
+      // 次へ進むボタン
+      document.getElementById('btnGotoStep4').addEventListener('click', () => changeStep(4));
+    }
+
+    function renderStep4() {
+      const container = document.getElementById('stepContentArea');
+      container.innerHTML = `
+        <div class="space-y-5">
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="bg-indigo-100 text-indigo-800 text-xs font-bold px-2.5 py-1 rounded-md">操作②</span>
+              <h2 class="text-base font-bold text-slate-900">行を絞り込む操作：選択（せんたく）</h2>
+            </div>
+            <p class="text-sm text-slate-700 mb-3">
+              問題：<strong class="text-slate-900 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">2Aの生徒だけを表示してください。</strong>
+            </p>
+
+            <!-- 用語の重要注意書きカード -->
+            <div class="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 mb-5 text-xs text-amber-900 space-y-1">
+              <div class="font-bold flex items-center gap-1.5 text-amber-800">
+                <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                高校「情報」の超重要ポイント：用語の混同に注意！
+              </div>
+              <p>● SQLの<code class="font-mono font-bold bg-amber-100 px-1 py-0.5 rounded">SELECT</code>という単語と、関係データベースの用語である<strong>『選択』</strong>は別の意味です。</p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 pt-1 border-t border-amber-200 font-medium">
+                <div class="bg-white/80 p-2 rounded border border-amber-200">
+                  <span class="font-bold text-indigo-700">射影</span> → SQLでは <code class="font-mono">SELECT 列名</code> で列を指定
+                </div>
+                <div class="bg-white/80 p-2 rounded border border-amber-200">
+                  <span class="font-bold text-emerald-700">選択</span> → SQLでは <code class="font-mono">WHERE 条件</code> で行を絞る
+                </div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      `;
+      
+      container.innerHTML += `
+              <!-- 左側：SQLエディタ -->
+              <div class="lg:col-span-7 flex flex-col space-y-3">
+                <div class="flex items-center justify-between">
+                  <label for="sqlEditor4" class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                    <span>SQLエディタ</span>
+                    <span class="text-[10px] text-indigo-600 font-normal">（'____' を書き換えてみよう）</span>
+                  </label>
+                  <button id="btnFillStep4" class="text-xs text-slate-500 hover:text-indigo-600 underline">
+                    初期テンプレに戻す
+                  </button>
+                </div>
+
+                <div class="relative">
+                  <textarea id="sqlEditor4" rows="5" class="w-full bg-slate-900 text-emerald-400 code-font text-sm p-4 rounded-xl border border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none transition leading-relaxed resize-none shadow-inner" spellcheck="false">SELECT student_name, class
+FROM students
+WHERE class = '____';</textarea>
+                </div>
+
+                <div class="flex items-center justify-between pt-1">
+                  <span class="text-[11px] text-slate-500">※SELECT文のみ実行可能</span>
+                  <button id="btnRunSql4" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2.5 rounded-xl shadow hover:shadow-md transition flex items-center gap-2">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span>SQLを実行</span>
+                  </button>
+                </div>
+
+                <!-- メッセージ領域 -->
+                <div id="step4Message" class="hidden rounded-xl p-3.5 text-xs font-medium"></div>
+              </div>
+
+              <!-- 右側：参考テーブル -->
+              <div class="lg:col-span-5 space-y-3">
+                <div class="text-xs font-bold text-slate-500">参照：students 表</div>
+                ${renderTablePreview('students', 'students (生徒表)')}
+              </div>
+            </div>
+
+            <!-- 実行結果領域 -->
+            <div class="mt-6 pt-5 border-t border-slate-200">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">実行結果</h3>
+                <span id="step4ResultCount" class="text-xs text-slate-500">未実行</span>
+              </div>
+              <div id="step4ResultTable" class="min-h-[90px] bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-center text-xs text-slate-400">
+                「SQLを実行」ボタンを押すとここに結果が表示されます。
+              </div>
+            </div>
+
+            <!-- 次へ進むボタン -->
+            <div id="step4NextArea" class="hidden flex justify-end pt-5">
+              <button id="btnGotoStep5" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-6 py-2.5 rounded-xl shadow hover:shadow-md transition flex items-center gap-2">
+                <span>STEP 5（結合）へ進む</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // テンプレ戻し
+      document.getElementById('btnFillStep4').addEventListener('click', () => {
+        document.getElementById('sqlEditor4').value = "SELECT student_name, class\nFROM students\nWHERE class = '____';";
+      });
+
+      // 実行ロジック
+      document.getElementById('btnRunSql4').addEventListener('click', () => {
+        const sql = document.getElementById('sqlEditor4').value;
+        const msgBox = document.getElementById('step4Message');
+        const resTable = document.getElementById('step4ResultTable');
+        const countSpan = document.getElementById('step4ResultCount');
+        const nextArea = document.getElementById('step4NextArea');
+
+        const validation = validateSelectOnly(sql);
+        if (!validation.valid) {
+          msgBox.className = "rounded-xl p-3.5 text-xs font-medium bg-red-50 text-red-700 border border-red-200 block";
+          msgBox.innerText = validation.message;
+          resTable.innerHTML = `<span class="text-red-500">${validation.message}</span>`;
+          countSpan.innerText = "エラー";
+          return;
+        }
+
+        try {
+          const res = appState.db.exec(sql);
+          if (res.length === 0) {
+            resTable.innerHTML = `<span class="text-slate-500">0件の結果が返されました。条件を見直してください。</span>`;
+            countSpan.innerText = "0件";
+            msgBox.className = "rounded-xl p-3.5 text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 block";
+            msgBox.innerText = "2Aの生徒が見つかりませんでした。WHERE class = '2A' と書かれているか確認してください。";
+            return;
+          }
+
+          const columns = res[0].columns;
+          const values = res[0].values;
+          countSpan.innerText = `${values.length} 件`;
+
+          let tableHtml = `
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="bg-indigo-50/70 border-b border-indigo-200 text-indigo-900">
+                  ${columns.map(c => `<th class="p-2 font-bold code-font">${c}</th>`).join('')}
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-200 bg-white">
+                ${values.map(r => `<tr>${r.map(v => `<td class="p-2">${v}</td>`).join('')}</tr>`).join('')}
+              </tbody>
+            </table>
+          `;
+          resTable.innerHTML = `<div class="w-full overflow-x-auto rounded-lg border border-slate-200">${tableHtml}</div>`;
+
+          // 成功判定: 佐藤と鈴木の2件
+          const names = values.map(r => {
+            const nameIdx = columns.findIndex(c => c.toLowerCase() === 'student_name');
+            return nameIdx !== -1 ? r[nameIdx] : null;
+          }).filter(Boolean);
+
+          const isTwoRows = values.length === 2;
+          const containsSatoAndSuzuki = names.includes('佐藤') && names.includes('鈴木');
+
+          if (isTwoRows && containsSatoAndSuzuki) {
+            msgBox.className = "rounded-xl p-3.5 text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 block";
+            msgBox.innerHTML = `<strong>成功！</strong> 条件に合う行を取り出す操作を<strong>『選択』</strong>といいます。佐藤・鈴木の2件が正しく抽出されました！`;
+            appState.stepSuccess[4] = true;
+            nextArea.classList.remove('hidden');
+          } else {
+            msgBox.className = "rounded-xl p-3.5 text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 block";
+            msgBox.innerText = "ヒント：class が '2A' の生徒だけが表示されるように WHERE class = '2A' と指定しましょう。";
+          }
+        } catch (e) {
+          msgBox.className = "rounded-xl p-3.5 text-xs font-medium bg-red-50 text-red-700 border border-red-200 block";
+          msgBox.innerText = `SQLエラー: ${e.message}`;
+          resTable.innerHTML = `<span class="text-red-500">文法に誤りがあります。シングルクォーテーション等を確認してください。</span>`;
+          countSpan.innerText = "エラー";
+        }
+      });
+
+      document.getElementById('btnGotoStep5').addEventListener('click', () => changeStep(5));
+    }
+
+    function renderStep5() {
+      const defaultJoinSql = `SELECT students.student_name, books.title\nFROM loans\nJOIN students\n  ON loans.student_id = students.student_id\nJOIN books\n  ON loans.book_id = books.book_id;`;
+
+      const container = document.getElementById('stepContentArea');
+      container.innerHTML = `
+        <div class="space-y-5">
+          <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="bg-indigo-100 text-indigo-800 text-xs font-bold px-2.5 py-1 rounded-md">操作③</span>
+              <h2 class="text-base font-bold text-slate-900">複数の表をつなぐ操作：結合（けつごう）</h2>
+            </div>
+            <p class="text-sm text-slate-700 mb-4">
+              問題：<strong class="text-slate-900 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">誰がどの本を借りたか、生徒名（student_name）と書籍名（title）を表示してください。</strong>
+            </p>
+
+            <!-- 結合キーの視覚図 -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-5">
+              <div class="text-xs font-bold text-slate-700 mb-2 flex items-center gap-2">
+                <span>🔗 結合の流れ（どのように表がつながるか）</span>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div class="bg-white p-3 rounded-lg border border-indigo-200 shadow-xs">
+                  <div class="font-bold text-indigo-700 mb-1">① 生徒情報との結合</div>
+                  <div class="code-font text-[11px] bg-indigo-50/70 p-2 rounded text-slate-700">
+                    students.<span class="text-indigo-600 font-bold">student_id</span><br>
+                    &nbsp;&nbsp;&nbsp;↓ (ON で一致)<br>
+                    loans.<span class="text-indigo-600 font-bold">student_id</span>
+                  </div>
+                </div>
+
+                <div class="bg-white p-3 rounded-lg border border-teal-200 shadow-xs">
+                  <div class="font-bold text-teal-700 mb-1">② 書籍情報との結合</div>
+                  <div class="code-font text-[11px] bg-teal-50/70 p-2 rounded text-slate-700">
+                    loans.<span class="text-teal-600 font-bold">book_id</span><br>
+                    &nbsp;&nbsp;&nbsp;↓ (ON で一致)<br>
+                    books.<span class="text-teal-600 font-bold">book_id</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+      `;
+
+      container.innerHTML += `
+            <p class="text-sm text-slate-600 mb-4">
+              下のSQLを読み、<strong>ON句でどのID同士を結んでいるか</strong>確認してから実行してください。
+            </p>
+
+            <!-- SQLエディタ -->
+            <div class="space-y-2 mb-4">
+              <div class="flex items-center justify-between">
+                <label for="sqlEditor5" class="text-xs font-bold text-slate-700">SQLエディタ</label>
+                <span class="text-[11px] text-slate-500">※SELECT文のみ実行可能</span>
+              </div>
+              <textarea id="sqlEditor5" rows="7" class="w-full bg-slate-900 text-emerald-400 code-font text-sm p-4 rounded-xl border border-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none transition leading-relaxed resize-none shadow-inner" spellcheck="false">${defaultJoinSql}</textarea>
+            </div>
+
+            <div class="flex justify-end mb-4">
+              <button id="btnRunSql5" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-6 py-2.5 rounded-xl shadow hover:shadow-md transition flex items-center gap-2">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>SQLを実行</span>
+              </button>
+            </div>
+      `;
+      
+      container.innerHTML += `
+            <!-- メッセージ領域 -->
+            <div id="step5Message" class="hidden rounded-xl p-4 text-xs font-medium mb-5"></div>
+
+            <!-- ON句の強調表示解説エリア（成功時表示） -->
+            <div id="step5KeyHighlight" class="hidden bg-slate-900 text-slate-200 rounded-xl p-4 mb-5 text-xs font-mono border border-slate-700 shadow-inner">
+              <div class="text-[11px] font-sans font-bold text-amber-400 mb-2">🔍 注目：ON句の左右で同じIDを比較している部分</div>
+              <p class="leading-loose">
+                SELECT students.student_name, books.title<br>
+                FROM loans<br>
+                JOIN students<br>
+                &nbsp;&nbsp;ON <span class="bg-indigo-900/80 text-indigo-300 font-bold px-1.5 py-0.5 rounded border border-indigo-500">loans.student_id = students.student_id</span><br>
+                JOIN books<br>
+                &nbsp;&nbsp;ON <span class="bg-teal-900/80 text-teal-300 font-bold px-1.5 py-0.5 rounded border border-teal-500">loans.book_id = books.book_id</span>;
+              </p>
+            </div>
+
+            <!-- 実行結果領域 -->
+            <div class="pt-2 border-t border-slate-200">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">実行結果</h3>
+                <span id="step5ResultCount" class="text-xs text-slate-500">未実行</span>
+              </div>
+              <div id="step5ResultTable" class="min-h-[90px] bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-center text-xs text-slate-400">
+                「SQLを実行」ボタンを押すとここに結果が表示されます。
+              </div>
+            </div>
+
+            <!-- 完了メッセージカード -->
+            <div id="step5FinishedCard" class="hidden mt-6 bg-white border-2 border-emerald-300 text-slate-800 rounded-xl p-5">
+              <div class="text-center">
+                <div class="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <svg class="w-5 h-5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                </div>
+                <h3 class="text-xl font-bold mb-1">全STEP完了</h3>
+                <p class="text-sm text-slate-600">STEP 1〜5 の達成条件をすべてクリアしました。</p>
+              </div>
+
+              <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-4 text-center text-sm font-semibold">
+                <div class="border border-emerald-200 bg-emerald-50 rounded-lg p-2">✓ STEP 1</div>
+                <div class="border border-emerald-200 bg-emerald-50 rounded-lg p-2">✓ STEP 2</div>
+                <div class="border border-emerald-200 bg-emerald-50 rounded-lg p-2">✓ STEP 3</div>
+                <div class="border border-emerald-200 bg-emerald-50 rounded-lg p-2">✓ STEP 4</div>
+                <div class="border border-emerald-200 bg-emerald-50 rounded-lg p-2">✓ STEP 5</div>
+              </div>
+
+              <div class="mt-5 bg-blue-50 border border-blue-200 rounded-xl p-4 text-left">
+                <div class="font-bold text-blue-900 mb-2">最後の提出</div>
+                <ol class="text-sm text-slate-700 space-y-1 list-decimal pl-5">
+                  <li>下の「提出用画面を表示」を押す。</li>
+                  <li>表示された完了画面のスクリーンショットを撮る。</li>
+                  <li>先生が指定した提出場所（Classroomの課題など）に画像を貼り付けて提出する。</li>
+                </ol>
+              </div>
+
+              <div class="mt-4 flex flex-wrap justify-center gap-3">
+                <button id="btnShowSubmitScreen" class="bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold px-5 py-2.5 rounded-lg transition">
+                  提出用画面を表示
+                </button>
+                <button id="btnRestartFromEnd" class="bg-slate-100 text-slate-700 hover:bg-slate-200 text-sm font-semibold px-5 py-2.5 rounded-lg transition">
+                  もう一度最初から復習する
+                </button>
+              </div>
+            </div>
+
+            <!-- スクリーンショット用の全画面表示 -->
+            <div id="submitScreen" class="hidden fixed inset-0 z-[100] bg-white flex items-center justify-center p-6">
+              <div class="w-full max-w-3xl border-4 border-emerald-500 rounded-2xl p-8 text-center bg-white shadow-xl">
+                <div class="text-5xl mb-3">✓</div>
+                <h2 class="text-3xl font-bold text-slate-900">データベース学習　全STEP完了</h2>
+                <p class="mt-3 text-lg text-slate-600">関係データベース・正規化・射影・選択・結合の学習を完了しました。</p>
+                <div class="grid grid-cols-5 gap-2 mt-6 text-sm font-bold">
+                  <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">STEP 1<br>✓</div>
+                  <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">STEP 2<br>✓</div>
+                  <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">STEP 3<br>✓</div>
+                  <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">STEP 4<br>✓</div>
+                  <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">STEP 5<br>✓</div>
+                </div>
+                <p id="completionTime" class="mt-6 text-sm text-slate-500"></p>
+                <p class="mt-4 text-base font-semibold text-blue-800">この画面をスクリーンショットして、指定された提出場所に貼り付けてください。</p>
+                <button id="btnCloseSubmitScreen" class="mt-6 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold px-5 py-2 rounded-lg">学習画面に戻る</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      `;
+
+      // 実行
+      document.getElementById('btnRunSql5').addEventListener('click', () => {
+        const sql = document.getElementById('sqlEditor5').value;
+        const msgBox = document.getElementById('step5Message');
+        const resTable = document.getElementById('step5ResultTable');
+        const countSpan = document.getElementById('step5ResultCount');
+        const highlightBox = document.getElementById('step5KeyHighlight');
+        const finishCard = document.getElementById('step5FinishedCard');
+
+        const validation = validateSelectOnly(sql);
+        if (!validation.valid) {
+          msgBox.className = "rounded-xl p-4 text-xs font-medium bg-red-50 text-red-700 border border-red-200 block";
+          msgBox.innerText = validation.message;
+          resTable.innerHTML = `<span class="text-red-500">${validation.message}</span>`;
+          countSpan.innerText = "エラー";
+          return;
+        }
+
+        try {
+          const res = appState.db.exec(sql);
+          if (res.length === 0) {
+            resTable.innerHTML = `<span class="text-slate-500">0件の結果が返されました。</span>`;
+            countSpan.innerText = "0件";
+            msgBox.className = "rounded-xl p-4 text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 block";
+            msgBox.innerText = "データが取得できませんでした。JOINの条件を確認してください。";
+            return;
+          }
+
+          const columns = res[0].columns;
+          const values = res[0].values;
+          countSpan.innerText = `${values.length} 件`;
+
+          let tableHtml = `
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="bg-indigo-50/70 border-b border-indigo-200 text-indigo-900">
+                  ${columns.map(c => `<th class="p-2 font-bold code-font">${c}</th>`).join('')}
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-200 bg-white">
+                ${values.map(r => `<tr>${r.map(v => `<td class="p-2">${v}</td>`).join('')}</tr>`).join('')}
+              </tbody>
+            </table>
+          `;
+          resTable.innerHTML = `<div class="w-full overflow-x-auto rounded-lg border border-slate-200">${tableHtml}</div>`;
+
+          // 成功判定：生徒名と書籍名の列があり、行数が6件
+          const hasStudentName = columns.some(c => c.toLowerCase().includes('student_name'));
+          const hasTitle = columns.some(c => c.toLowerCase().includes('title'));
+          const isSixRows = values.length === 6;
+
+          if (hasStudentName && hasTitle && isSixRows) {
+            msgBox.className = "rounded-xl p-4 text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 block leading-relaxed";
+            msgBox.innerHTML = `
+              <div class="font-bold text-sm text-emerald-900 mb-1">🎉 結合成功！</div>
+              <p>複数の表を共通する値（キー）を使ってつなぐ操作を<strong>『結合（JOIN）』</strong>といいます。</p>
+              <p class="mt-1">これにより、別々の表に分かれていた「生徒名」と「本の名」が1つの表のようにまとまりました！</p>
+            `;
+            highlightBox.classList.remove('hidden');
+            finishCard.classList.remove('hidden');
+            appState.stepSuccess[5] = true;
+
+            finishCard.scrollIntoView({ behavior: 'smooth' });
+          } else {
+            msgBox.className = "rounded-xl p-4 text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200 block";
+            msgBox.innerText = "ヒント：生徒名（student_name）と書籍名（title）の2列が含まれ、全6件の貸出データが表示されるSQLを実行してみましょう。完成例SQLの利用がおすすめです。";
+          }
+        } catch (e) {
+          msgBox.className = "rounded-xl p-4 text-xs font-medium bg-red-50 text-red-700 border border-red-200 block";
+          msgBox.innerText = `SQLエラー: ${e.message}`;
+          resTable.innerHTML = `<span class="text-red-500">文法に誤りがあります。JOIN句やON句のスペルを確認してください。</span>`;
+          countSpan.innerText = "エラー";
+        }
+      });
+
+      const btnShowSubmit = document.getElementById('btnShowSubmitScreen');
+      const submitScreen = document.getElementById('submitScreen');
+      const btnCloseSubmit = document.getElementById('btnCloseSubmitScreen');
+      if (btnShowSubmit && submitScreen) {
+        btnShowSubmit.addEventListener('click', () => {
+          if (!appState.stepSuccess.slice(1).every(Boolean)) {
+            showModal("未完了のSTEPがあります", "すべてのSTEPを成功させてから提出用画面を表示してください。");
+            return;
+          }
+          const now = new Date();
+          const timeEl = document.getElementById('completionTime');
+          if (timeEl) timeEl.textContent = `完了日時：${now.toLocaleString('ja-JP')}`;
+          submitScreen.classList.remove('hidden');
+        });
+      }
+      if (btnCloseSubmit && submitScreen) {
+        btnCloseSubmit.addEventListener('click', () => submitScreen.classList.add('hidden'));
+      }
+
+      const btnRestart = document.getElementById('btnRestartFromEnd');
+      if (btnRestart) {
+        btnRestart.addEventListener('click', resetAll);
+      }
+    }
+
+    function changeStep(stepNumber) {
+      if (stepNumber < 1 || stepNumber > appState.totalSteps) return;
+
+      // STEPの飛ばし防止：次のSTEPへ進むには、直前STEPの成功が必須
+      if (stepNumber > appState.currentStep) {
+        const requiredStep = stepNumber - 1;
+        if (!appState.stepSuccess[requiredStep]) {
+          showModal(
+            "まだ次へ進めません",
+            `STEP ${requiredStep} の達成条件を満たしてから進んでください。SQLのSTEPでは、正しい実行結果が出るまで次へ進めません。`
+          );
+          return;
+        }
+      }
+
+      // 2つ以上先への直接移動も禁止
+      if (stepNumber > appState.currentStep + 1) {
+        showModal("STEPを順番に進めてください", "前のSTEPを飛ばすことはできません。");
+        return;
+      }
+
+      appState.currentStep = stepNumber;
+      updateGuides(stepNumber);
+
+      switch (stepNumber) {
+        case 1:
+          renderStep1();
+          break;
+        case 2:
+          renderStep2();
+          break;
+        case 3:
+          renderStep3();
+          break;
+        case 4:
+          renderStep4();
+          break;
+        case 5:
+          renderStep5();
+          break;
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetAll() {
+      if (appState.db) {
+        try {
+          appState.db.close();
+        } catch(e) {}
+      }
+      // 再初期化
+      initDatabase().then(() => {
+        appState.currentStep = 1;
+        appState.stepSuccess = [false, false, false, false, false, false];
+        changeStep(1);
+        showModal("初期化完了", "データベースと学習の進行状況を最初に戻しました。", false);
+      });
+    }
+
+    document.getElementById('btnResetAll').addEventListener('click', resetAll);
+
+    // アプリ初期ロード
+    window.addEventListener('DOMContentLoaded', async () => {
+      await initDatabase();
+      changeStep(1);
+    });
+  </script>
+</body>
+</html>
