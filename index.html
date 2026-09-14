@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>関係データベース・SQL体験学習</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #667085;
+      --line: #d9e0ea;
+      --blue: #245ea8;
+      --blue-dark: #17477f;
+      --blue-soft: #eef5ff;
+      --green: #18794e;
+      --green-soft: #edf8f2;
+      --red: #b42318;
+      --red-soft: #fff0ee;
+      --amber: #8a5a00;
+      --amber-soft: #fff8e8;
+      --radius: 14px;
+      --shadow: 0 4px 14px rgba(16, 24, 40, 0.06);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Yu Gothic", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.65;
+    }
+
+    button, textarea, input { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .45; }
+
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(255,255,255,.97);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(8px);
+    }
+
+    .header-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      min-height: 68px;
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: grid; place-items: center;
+      background: var(--blue); color: white; font-weight: 800;
+      flex: 0 0 auto;
+    }
+    .brand h1 { margin: 0; font-size: 1.06rem; line-height: 1.3; }
+    .brand p { margin: 2px 0 0; font-size: .82rem; color: var(--muted); }
+
+    .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .progress-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1px solid var(--line); border-radius: 999px;
+      padding: 6px 10px; background: #fff; font-size: .86rem;
+    }
+    .progress-pill strong { color: var(--blue-dark); }
+
+    .progress-track { height: 4px; background: #e7ebf1; }
+    .progress-bar { height: 100%; width: 16.666%; background: var(--blue); transition: width .25s ease; }
+
+    main { max-width: 1120px; margin: 0 auto; padding: 22px 18px 42px; }
+
+    .guide-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .guide-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 13px 14px;
+      box-shadow: 0 1px 4px rgba(16,24,40,.03);
+    }
+    .guide-card.primary { border-left: 4px solid var(--blue); }
+    .guide-label { display: block; font-size: .78rem; font-weight: 800; color: #475467; margin-bottom: 4px; }
+    .guide-card.primary .guide-label { color: var(--blue-dark); }
+    .guide-text { margin: 0; font-size: .96rem; }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .step-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+    .step-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 78px; padding: 5px 10px; border-radius: 999px;
+      background: var(--blue-soft); color: var(--blue-dark); font-size: .8rem; font-weight: 800;
+    }
+    h2 { margin: 0; font-size: 1.28rem; line-height: 1.35; }
+    h3 { margin: 0 0 8px; font-size: 1rem; }
+    p { margin-top: 0; }
+
+    .lead { font-size: 1rem; color: #344054; margin-bottom: 14px; }
+    .small { font-size: .86rem; color: var(--muted); }
+    .keyline { color: var(--blue-dark); font-weight: 800; }
+
+    .data-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; min-width: 540px; background: white; }
+    th, td { padding: 11px 12px; text-align: left; border-bottom: 1px solid #e9edf3; }
+    th { background: #f2f5f9; color: #475467; font-size: .85rem; }
+    td { font-size: .92rem; }
+    tr:last-child td { border-bottom: 0; }
+    .highlight-row { background: #f2f7ff; }
+    .id-sub { display: block; color: var(--muted); font-size: .78rem; margin-top: 2px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+    .question-box {
+      margin-top: 16px;
+      padding: 16px;
+      background: var(--blue-soft);
+      border: 1px solid #cfe0f8;
+      border-radius: 12px;
+    }
+    .question-title { font-weight: 800; margin-bottom: 10px; }
+    .choices { display: flex; flex-wrap: wrap; gap: 8px; }
+    .choice {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: #fff; border: 1px solid #cfd7e3;
+      border-radius: 10px; padding: 9px 12px;
+    }
+
+    .btn {
+      border: 0; border-radius: 10px; padding: 10px 16px;
+      font-weight: 800; transition: .15s ease; min-height: 42px;
+    }
+    .btn-primary { background: var(--blue); color: white; }
+    .btn-primary:hover { background: var(--blue-dark); }
+    .btn-secondary { background: #eef1f5; color: #344054; }
+    .btn-secondary:hover { background: #e2e7ee; }
+    .btn-ghost { background: white; color: var(--blue-dark); border: 1px solid #bfd2ec; }
+    .btn-ghost:hover { background: var(--blue-soft); }
+    .btn-danger-lite { background: white; color: #7a271a; border: 1px solid #f1b7ad; }
+
+    .actions { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+    .actions-right { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+
+    .feedback {
+      border-radius: 10px; padding: 11px 13px; margin-top: 12px;
+      font-size: .92rem; font-weight: 650;
+    }
+    .feedback.success { background: var(--green-soft); color: var(--green); border: 1px solid #b7e1ca; }
+    .feedback.error { background: var(--red-soft); color: var(--red); border: 1px solid #f5c5be; }
+    .feedback.warn { background: var(--amber-soft); color: var(--amber); border: 1px solid #f2dba5; }
+
+    .relation-grid {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      align-items: stretch;
+      gap: 10px;
+      margin: 16px 0;
+    }
+    .relation-card {
+      border: 1px solid var(--line); border-radius: 12px; padding: 14px;
+      background: #fff;
+    }
+    .relation-card strong { display: block; color: var(--blue-dark); margin-bottom: 7px; }
+    .relation-arrow { display: grid; place-items: center; color: var(--blue); font-size: 1.6rem; font-weight: 800; }
+    .relation-main { font-size: 1.03rem; font-weight: 800; }
+    .relation-sub { color: var(--muted); font-size: .84rem; }
+
+    details { border: 1px solid var(--line); border-radius: 12px; background: #fff; margin-top: 14px; }
+    summary { cursor: pointer; padding: 12px 14px; font-weight: 800; color: #344054; }
+    .details-inner { padding: 0 14px 14px; }
+
+    .sql-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(300px, .7fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .sql-editor {
+      width: 100%; min-height: 145px; resize: vertical;
+      padding: 14px; border-radius: 12px; border: 1px solid #243244;
+      background: #111827; color: #d1fae5;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 1rem; line-height: 1.65;
+      outline: none;
+    }
+    .sql-editor:focus { border-color: #5c8fd0; box-shadow: 0 0 0 3px rgba(36,94,168,.15); }
+
+    .result-box { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 15px; }
+    .result-placeholder {
+      min-height: 86px; display: grid; place-items: center; text-align: center;
+      background: #f8fafc; border: 1px dashed #cfd7e3; border-radius: 10px;
+      color: var(--muted); padding: 12px;
+    }
+    .result-table { min-width: 0; }
+
+    .hint-stack { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .hint-text { margin-top: 10px; padding: 10px 12px; border-left: 4px solid #9fbbe0; background: #f5f8fc; border-radius: 8px; }
+
+    .term-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .term-card { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #fff; }
+    .term-card strong { display: block; color: var(--blue-dark); margin-bottom: 3px; }
+    .term-card span { font-size: .88rem; color: #475467; }
+
+    .complete-card { text-align: center; border: 2px solid #b7e1ca; background: #fbfffc; }
+    .complete-mark { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; margin: 0 auto 10px; background: var(--green-soft); color: var(--green); font-size: 1.8rem; font-weight: 900; }
+    .step-checks { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; margin: 16px 0; }
+    .step-check { border: 1px solid #b7e1ca; background: var(--green-soft); color: var(--green); padding: 8px 5px; border-radius: 9px; font-size: .8rem; font-weight: 800; }
+
+    .submit-screen {
+      position: fixed; inset: 0; z-index: 100;
+      background: #fff; display: none; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .submit-sheet {
+      width: min(900px, 100%);
+      border: 4px solid var(--green);
+      border-radius: 20px;
+      padding: 30px;
+      text-align: center;
+      background: #fff;
+    }
+    .submit-sheet h2 { font-size: clamp(1.8rem, 4vw, 2.6rem); margin-bottom: 10px; }
+    .submit-sheet .step-checks { margin-top: 22px; }
+
+    .hidden { display: none !important; }
+
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 80; display: none;
+      align-items: center; justify-content: center;
+      background: rgba(15,23,42,.45); padding: 18px;
+    }
+    .modal {
+      width: min(460px, 100%); background: #fff; border-radius: 14px;
+      padding: 20px; border: 1px solid var(--line); box-shadow: 0 18px 48px rgba(15,23,42,.22);
+    }
+    .modal h3 { font-size: 1.1rem; margin-bottom: 8px; }
+    .modal p { color: #475467; white-space: pre-line; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+
+    @media (max-width: 820px) {
+      .guide-grid { grid-template-columns: 1fr; }
+      .sql-layout { grid-template-columns: 1fr; }
+      .relation-grid { grid-template-columns: 1fr; }
+      .relation-arrow { transform: rotate(90deg); min-height: 20px; }
+      .term-grid { grid-template-columns: 1fr 1fr; }
+      .step-checks { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 620px) {
+      .brand p { display: none; }
+      .header-inner { align-items: flex-start; }
+      .header-actions { gap: 6px; }
+      .progress-pill span { display: none; }
+      main { padding-left: 12px; padding-right: 12px; }
+      .panel { padding: 16px; }
+      .term-grid { grid-template-columns: 1fr; }
+      .step-checks { grid-template-columns: repeat(2, 1fr); }
+      .submit-sheet { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-mark">DB</div>
+        <div>
+          <h1>関係データベース・SQL体験学習</h1>
+          <p>60分で「正規化・射影・選択・結合」を体験</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="progress-pill"><span>進捗</span><strong id="progressText">STEP 1 / 6</strong></div>
+        <button class="btn btn-danger-lite" id="resetBtn" type="button">最初からやり直す</button>
+      </div>
+    </div>
+    <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
+  </header>
+
+  <main>
+    <section class="guide-grid" aria-label="学習ガイド">
+      <div class="guide-card primary">
+        <span class="guide-label">① やること</span>
+        <p class="guide-text" id="guideAction"></p>
+      </div>
+      <div class="guide-card">
+        <span class="guide-label">② 使うもの／ヒント</span>
+        <p class="guide-text" id="guideHint"></p>
+      </div>
+      <div class="guide-card">
+        <span class="guide-label">③ 成功条件</span>
+        <p class="guide-text" id="guideSuccess"></p>
+      </div>
+      <div class="guide-card">
+        <span class="guide-label">④ 終わったら何をするか</span>
+        <p class="guide-text" id="guideNext"></p>
+      </div>
+    </section>
+
+    <div id="content"></div>
+  </main>
+
+  <div class="submit-screen" id="submitScreen" aria-hidden="true">
+    <div class="submit-sheet">
+      <div class="complete-mark">✓</div>
+      <h2>データベース学習　全STEP完了</h2>
+      <p>関係データベース・正規化・SQL・射影・選択・結合の学習を完了しました。</p>
+      <div class="step-checks">
+        <div class="step-check">STEP 1<br>✓</div>
+        <div class="step-check">STEP 2<br>✓</div>
+        <div class="step-check">STEP 3<br>✓</div>
+        <div class="step-check">STEP 4<br>✓</div>
+        <div class="step-check">STEP 5<br>✓</div>
+        <div class="step-check">STEP 6<br>✓</div>
+      </div>
+      <p id="completionTime" class="small"></p>
+      <p style="font-weight:800;color:var(--blue-dark);margin-top:18px;">この画面をスクリーンショットして、Classroomの指定された提出場所に提出してください。</p>
+      <button class="btn btn-secondary" id="closeSubmitScreen" type="button">学習画面に戻る</button>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal">
+      <h3 id="modalTitle">確認</h3>
+      <p id="modalMessage"></p>
+      <div class="modal-actions" id="modalActions">
+        <button class="btn btn-primary" id="modalOk" type="button">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // 教師向け設定：問題文や初期データを変える場合は、まずここを編集してください。
+    // ============================================================
+    const DATA = {
+      students: [
+        { student_id: "S01", student_name: "佐藤", class: "2A" },
+        { student_id: "S02", student_name: "鈴木", class: "2A" },
+        { student_id: "S03", student_name: "高橋", class: "2B" },
+        { student_id: "S04", student_name: "伊藤", class: "2B" }
+      ],
+      books: [
+        { book_id: "B01", title: "データベース入門", author: "山田" },
+        { book_id: "B02", title: "SQL入門", author: "田中" },
+        { book_id: "B03", title: "情報システム基礎", author: "佐々木" }
+      ],
+      loans: [
+        { loan_id: 1, student_id: "S01", book_id: "B02", loan_date: "2026-06-01" },
+        { loan_id: 2, student_id: "S02", book_id: "B01", loan_date: "2026-06-02" },
+        { loan_id: 3, student_id: "S03", book_id: "B02", loan_date: "2026-06-03" },
+        { loan_id: 4, student_id: "S01", book_id: "B03", loan_date: "2026-06-04" },
+        { loan_id: 5, student_id: "S04", book_id: "B01", loan_date: "2026-06-05" },
+        { loan_id: 6, student_id: "S02", book_id: "B03", loan_date: "2026-06-06" }
+      ]
+    };
+
+    const GUIDES = {
+      1: {
+        action: "1枚の表を見て、同じ生徒情報を何度も持つと何が困るか考えます。",
+        hint: "佐藤さんが何回登場するかに注目します。",
+        success: "『2か所』を選んで正解する。",
+        next: "正解後に説明を読み、STEP 2へ進みます。"
+      },
+      2: {
+        action: "分けた表でも、共通するIDをたどると情報がつながることを確認します。",
+        hint: "students表とloans表の両方にあるIDを探します。",
+        success: "確認問題で student_id を選んで正解する。",
+        next: "正解するとSTEP 3へ進めます。"
+      },
+      3: {
+        action: "students表から、生徒名の列だけをSQLで取り出します。",
+        hint: "SELECTの後ろに、表示したい列名を書きます。",
+        success: "student_name列だけが4件表示される。",
+        next: "成功後、射影の意味を確認してSTEP 4へ進みます。"
+      },
+      4: {
+        action: "students表から、2Aの生徒だけをSQLで取り出します。",
+        hint: "WHEREで条件に合う行を絞ります。",
+        success: "佐藤・鈴木の2件が表示される。",
+        next: "成功後、選択の意味を確認してSTEP 5へ進みます。"
+      },
+      5: {
+        action: "貸出記録のIDをたどって、『誰が』『どの本を』借りたか調べます。",
+        hint: "S01はstudents表、B02はbooks表で探します。",
+        success: "S01＝佐藤、B02＝SQL入門の2問に正解する。",
+        next: "2問とも正解するとSTEP 6へ進めます。"
+      },
+      6: {
+        action: "2Bの生徒について、生徒名だけを表示するSQLを自分で作ります。",
+        hint: "SELECT / FROM / WHERE を使います。",
+        success: "student_name列だけに、高橋・伊藤の2件が表示される。",
+        next: "成功すると全STEP完了画面が表示されます。"
+      }
+    };
+
+    const state = {
+      currentStep: 1,
+      success: [false, false, false, false, false, false, false],
+      answers: { step1: null, step2: null, step5a: null, step5b: null },
+      sql: {
+        3: "SELECT ________\nFROM students;",
+        4: "SELECT student_name, class\nFROM students\nWHERE class = '____';",
+        6: ""
+      },
+      hintLevel6: 0,
+      completionTime: null
+    };
+
+    const content = document.getElementById("content");
+    const progressText = document.getElementById("progressText");
+    const progressBar = document.getElementById("progressBar");
+
+    function esc(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function showModal(title, message, options = {}) {
+      const backdrop = document.getElementById("modalBackdrop");
+      document.getElementById("modalTitle").textContent = title;
+      document.getElementById("modalMessage").textContent = message;
+      const actions = document.getElementById("modalActions");
+      actions.innerHTML = "";
+
+      if (options.confirm) {
+        const cancel = document.createElement("button");
+        cancel.className = "btn btn-secondary";
+        cancel.textContent = "キャンセル";
+        cancel.onclick = () => { backdrop.style.display = "none"; };
+        actions.appendChild(cancel);
+
+        const ok = document.createElement("button");
+        ok.className = "btn btn-primary";
+        ok.textContent = options.confirmLabel || "実行する";
+        ok.onclick = () => {
+          backdrop.style.display = "none";
+          options.onConfirm?.();
+        };
+        actions.appendChild(ok);
+      } else {
+        const ok = document.createElement("button");
+        ok.className = "btn btn-primary";
+        ok.textContent = "OK";
+        ok.onclick = () => { backdrop.style.display = "none"; };
+        actions.appendChild(ok);
+      }
+
+      backdrop.style.display = "flex";
+    }
+
+    function updateHeaderAndGuides() {
+      const step = state.currentStep;
+      progressText.textContent = `STEP ${step} / 6`;
+      progressBar.style.width = `${(step / 6) * 100}%`;
+      const g = GUIDES[step];
+      document.getElementById("guideAction").textContent = g.action;
+      document.getElementById("guideHint").textContent = g.hint;
+      document.getElementById("guideSuccess").textContent = g.success;
+      document.getElementById("guideNext").textContent = g.next;
+    }
+
+    function canMoveTo(step) {
+      if (step <= state.currentStep) return true;
+      for (let s = 1; s < step; s++) {
+        if (!state.success[s]) return false;
+      }
+      return true;
+    }
+
+    function changeStep(step) {
+      if (step < 1 || step > 6) return;
+      if (!canMoveTo(step)) {
+        showModal("まだ次へ進めません", "前のSTEPの成功条件を達成してから進んでください。");
+        return;
+      }
+      state.currentStep = step;
+      updateHeaderAndGuides();
+      renderCurrentStep();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function backButtonHtml(step) {
+      if (step === 1) return "";
+      return `<button class="btn btn-secondary" type="button" data-back="${step - 1}">← 前のSTEPへ</button>`;
+    }
+
+    function nextButtonHtml(step, label) {
+      if (!state.success[step]) return "";
+      return `<button class="btn btn-primary" type="button" data-next="${step + 1}">${esc(label)} →</button>`;
+    }
+
+    function bindNavButtons() {
+      content.querySelectorAll("[data-back]").forEach(btn => {
+        btn.addEventListener("click", () => changeStep(Number(btn.dataset.back)));
+      });
+      content.querySelectorAll("[data-next]").forEach(btn => {
+        btn.addEventListener("click", () => changeStep(Number(btn.dataset.next)));
+      });
+    }
+
+    function renderCurrentStep() {
+      const step = state.currentStep;
+      if (step === 1) renderStep1();
+      if (step === 2) renderStep2();
+      if (step === 3) renderStep3();
+      if (step === 4) renderStep4();
+      if (step === 5) renderStep5();
+      if (step === 6) renderStep6();
+      bindNavButtons();
+    }
+
+    function miniTable(rows, columns) {
+      const heads = columns.map(c => `<th>${esc(c.label)}</th>`).join("");
+      const body = rows.map(row => `<tr>${columns.map(c => `<td>${esc(row[c.key])}</td>`).join("")}</tr>`).join("");
+      return `<div class="data-table-wrap"><table><thead><tr>${heads}</tr></thead><tbody>${body}</tbody></table></div>`;
+    }
+
+    function renderStep1() {
+      const rows = [
+        { loan_id: 1, student: "佐藤", sid: "S01", class: "2A", book: "SQL入門", bid: "B02" },
+        { loan_id: 2, student: "鈴木", sid: "S02", class: "2A", book: "データベース入門", bid: "B01" },
+        { loan_id: 4, student: "佐藤", sid: "S01", class: "2A", book: "情報システム基礎", bid: "B03" }
+      ];
+
+      content.innerHTML = `
+        <section class="panel">
+          <div class="step-title-row"><span class="step-badge">STEP 1</span><h2>なぜ1枚の表では困るのか</h2></div>
+          <p class="lead">図書館の貸出情報を1枚の表にまとめています。佐藤さんの情報が複数の行にあります。</p>
+          <div class="data-table-wrap">
+            <table>
+              <thead><tr><th>貸出ID</th><th>生徒</th><th>クラス</th><th>書籍</th></tr></thead>
+              <tbody>
+                ${rows.map(r => `
+                  <tr class="${r.sid === "S01" ? "highlight-row" : ""}">
+                    <td>${r.loan_id}</td>
+                    <td><strong>${esc(r.student)}</strong><span class="id-sub">${esc(r.sid)}</span></td>
+                    <td><strong>${esc(r.class)}</strong></td>
+                    <td><strong>${esc(r.book)}</strong><span class="id-sub">${esc(r.bid)}</span></td>
+                  </tr>`).join("")}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="question-box">
+            <div class="question-title">佐藤さんのクラスが2Aから2Bに変わりました。何か所変更する必要がありますか？</div>
+            <div class="choices">
+              ${[1,2,3].map(v => `<label class="choice"><input type="radio" name="q1" value="${v}" ${state.answers.step1 == v ? "checked" : ""}> ${v}か所</label>`).join("")}
+            </div>
+            <div style="margin-top:12px"><button class="btn btn-primary" id="checkStep1" type="button">回答する</button></div>
+            <div id="step1Feedback">${state.success[1] ? `
+              <div class="feedback success"><strong>正解です。</strong> 同じ情報を複数の場所に保存すると、修正漏れが起こる可能性があります。<br>同じ情報の重複を減らし、役割ごとの表に整理して管理しやすくすることを <strong>正規化</strong> といいます。</div>` : ""}</div>
+          </div>
+
+          <div class="actions">
+            ${backButtonHtml(1)}
+            <div class="actions-right">${nextButtonHtml(1, "STEP 2へ")}</div>
+          </div>
+        </section>`;
+
+      document.getElementById("checkStep1").addEventListener("click", () => {
+        const selected = content.querySelector('input[name="q1"]:checked');
+        if (!selected) {
+          showModal("選択してください", "1か所・2か所・3か所のどれかを選んでください。");
+          return;
+        }
+        state.answers.step1 = Number(selected.value);
+        if (state.answers.step1 === 2) {
+          state.success[1] = true;
+          renderStep1();
+          bindNavButtons();
+        } else {
+          showModal("もう一度確認", "佐藤さんが表の中に何回登場するか確認してみましょう。");
+        }
+      });
+    }
+
+    function renderStep2() {
+      content.innerHTML = `
+        <section class="panel">
+          <div class="step-title-row"><span class="step-badge">STEP 2</span><h2>表を分けても、情報はつながる</h2></div>
+          <p class="lead">データを表として管理し、共通するIDなどを使って複数の表を関連付けるデータベースを <strong>関係データベース</strong> といいます。</p>
+
+          <div class="relation-grid">
+            <div class="relation-card"><strong>students</strong><div class="relation-main">S01 → 佐藤</div><div class="relation-sub">生徒の情報</div></div>
+            <div class="relation-arrow">→</div>
+            <div class="relation-card"><strong>loans</strong><div class="relation-main">S01 / B02</div><div class="relation-sub">貸出の記録</div></div>
+            <div class="relation-arrow">→</div>
+            <div class="relation-card"><strong>books</strong><div class="relation-main">B02 → SQL入門</div><div class="relation-sub">本の情報</div></div>
+          </div>
+
+          <div class="feedback success" style="background:#f5f8fc;color:#344054;border-color:#d7e0eb;">
+            S01をstudents表で見ると「佐藤」、B02をbooks表で見ると「SQL入門」です。つまり、この貸出記録は「佐藤さんがSQL入門を借りた」と読み取れます。
+          </div>
+
+          <details>
+            <summary>実際の3つの表を見る（必要なときだけ）</summary>
+            <div class="details-inner">
+              <h3>students</h3>
+              ${miniTable(DATA.students, [
+                {key:"student_id",label:"student_id"}, {key:"student_name",label:"student_name"}, {key:"class",label:"class"}
+              ])}
+              <h3 style="margin-top:14px">books</h3>
+              ${miniTable(DATA.books, [
+                {key:"book_id",label:"book_id"}, {key:"title",label:"title"}, {key:"author",label:"author"}
+              ])}
+              <h3 style="margin-top:14px">loans</h3>
+              ${miniTable(DATA.loans, [
+                {key:"loan_id",label:"loan_id"}, {key:"student_id",label:"student_id"}, {key:"book_id",label:"book_id"}, {key:"loan_date",label:"loan_date"}
+              ])}
+            </div>
+          </details>
+
+          <div class="question-box">
+            <div class="question-title">確認：students表とloans表の両方にあるIDはどれですか？</div>
+            <div class="choices">
+              ${["loan_id","student_id","title"].map(v => `<label class="choice"><input type="radio" name="q2" value="${v}" ${state.answers.step2 === v ? "checked" : ""}> ${v}</label>`).join("")}
+            </div>
+            <div style="margin-top:12px"><button class="btn btn-primary" id="checkStep2" type="button">回答する</button></div>
+            <div id="step2Feedback">${state.success[2] ? `<div class="feedback success"><strong>正解です。</strong> 同じ student_id を手がかりにすると、loansのS01が佐藤さんだと分かります。</div>` : ""}</div>
+          </div>
+
+          <div class="actions">
+            ${backButtonHtml(2)}
+            <div class="actions-right">${nextButtonHtml(2, "STEP 3へ")}</div>
+          </div>
+        </section>`;
+
+      document.getElementById("checkStep2").addEventListener("click", () => {
+        const selected = content.querySelector('input[name="q2"]:checked');
+        if (!selected) {
+          showModal("選択してください", "3つの候補から1つ選んでください。");
+          return;
+        }
+        state.answers.step2 = selected.value;
+        if (selected.value === "student_id") {
+          state.success[2] = true;
+          renderStep2(); bindNavButtons();
+        } else {
+          showModal("もう一度確認", "students表とloans表の両方に書かれている項目名を探してください。");
+        }
+      });
+    }
+
+    // ============================================================
+    // 授業用の軽量SQL実行機能
+    // SELECT / FROM / WHERE の基本形だけを扱います。
+    // 外部ライブラリを使わないため、学校ネットワークでも動きやすい構成です。
+    // ============================================================
+    function runLearningSql(rawSql) {
+      let sql = String(rawSql || "").trim();
+      if (!sql) return { ok: false, message: "SQLが入力されていません。" };
+
+      sql = sql.replace(/--.*$/gm, "").trim();
+
+      const forbidden = /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE|TRUNCATE|ATTACH|PRAGMA)\b/i;
+      if (forbidden.test(sql)) {
+        return { ok: false, message: "この教材ではデータを取り出すSELECT文だけを使います。" };
+      }
+      if (!/^SELECT\b/i.test(sql)) {
+        return { ok: false, message: "この教材ではデータを取り出すSELECT文だけを使います。" };
+      }
+      if (!/\bFROM\b/i.test(sql)) {
+        return { ok: false, message: "どの表から取り出すかFROMで指定してください。" };
+      }
+
+      const match = sql.match(/^SELECT\s+([\s\S]+?)\s+FROM\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:WHERE\s+([\s\S]+?))?\s*;?\s*$/i);
+      if (!match) {
+        return { ok: false, message: "SQLの形を確認してください。SELECT → FROM → WHERE の順に書きます。" };
+      }
+
+      const selectPart = match[1].trim();
+      const tableName = match[2].trim();
+      const wherePart = match[3] ? match[3].trim() : null;
+
+      if (!DATA[tableName]) {
+        return { ok: false, message: "表名を確認してください。" };
+      }
+
+      const sample = DATA[tableName][0] || {};
+      const allColumns = Object.keys(sample);
+      const columns = selectPart === "*"
+        ? [...allColumns]
+        : selectPart.split(",").map(s => s.trim()).filter(Boolean);
+
+      if (columns.length === 0) {
+        return { ok: false, message: "SELECTの後に、表示したい列名を書いてください。" };
+      }
+      for (const col of columns) {
+        if (!allColumns.includes(col)) {
+          return { ok: false, message: "表示したい列名を確認してください。" };
+        }
+      }
+
+      let rows = DATA[tableName].map(r => ({ ...r }));
+
+      if (wherePart) {
+        const whereMatch = wherePart.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;?$/);
+        if (!whereMatch) {
+          return { ok: false, message: "WHEREの条件を確認してください。例：WHERE class = '2A'" };
+        }
+        const whereCol = whereMatch[1];
+        let rawValue = whereMatch[2].trim();
+
+        if (!allColumns.includes(whereCol)) {
+          return { ok: false, message: "WHEREで指定した列名を確認してください。" };
+        }
+
+        let value;
+        const quoted = rawValue.match(/^'([^']*)'$/);
+        if (quoted) {
+          value = quoted[1];
+        } else if (/^-?\d+(?:\.\d+)?$/.test(rawValue)) {
+          value = Number(rawValue);
+        } else {
+          return { ok: false, message: "文字は '2A' のように ' ' で囲みます。" };
+        }
+        rows = rows.filter(r => String(r[whereCol]) === String(value));
+      }
+
+      const projected = rows.map(r => columns.map(c => r[c]));
+      return { ok: true, columns, rows: projected };
+    }
+
+    function renderResult(result) {
+      if (!result || !result.ok) return `<div class="result-placeholder">「SQLを実行」を押すと、ここに結果が表示されます。</div>`;
+      if (result.rows.length === 0) return `<div class="result-placeholder">0件でした。条件を確認してください。</div>`;
+      return `<div class="data-table-wrap result-table"><table><thead><tr>${result.columns.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${result.rows.map(r => `<tr>${r.map(v => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    }
+
+    function renderStep3(lastResult = null, feedback = "") {
+      content.innerHTML = `
+        <section class="panel">
+          <div class="step-title-row"><span class="step-badge">STEP 3</span><h2>必要な「列」を取り出す：射影</h2></div>
+          <p class="lead">問題：students表から、生徒名（student_name）だけを表示してください。</p>
+
+          <div class="sql-layout">
+            <div>
+              <h3>SQLを入力</h3>
+              <textarea class="sql-editor" id="sql3" spellcheck="false">${esc(state.sql[3])}</textarea>
+              <div class="hint-stack">
+                <button class="btn btn-ghost" type="button" id="hint3a">ヒント1</button>
+                <button class="btn btn-ghost" type="button" id="hint3b">ヒント2</button>
+                <button class="btn btn-secondary" type="button" id="resetSql3">最初の形に戻す</button>
+              </div>
+              <div id="hintText3"></div>
+              <div style="margin-top:12px"><button class="btn btn-primary" type="button" id="run3">SQLを実行</button></div>
+              ${feedback}
+            </div>
+            <div>
+              <h3>参考：students表</h3>
+              ${miniTable(DATA.students, [
+                {key:"student_id",label:"student_id"}, {key:"student_name",label:"student_name"}, {key:"class",label:"class"}
+              ])}
+            </div>
+          </div>
+          <div class="result-box"><h3>実行結果</h3>${renderResult(lastResult)}</div>
+
+          <div class="actions">
+            ${backButtonHtml(3)}
+            <div class="actions-right">${nextButtonHtml(3, "STEP 4へ")}</div>
+          </div>
+        </section>`;
+
+      const editor = document.getElementById("sql3");
+      editor.addEventListener("input", () => { state.sql[3] = editor.value; });
+      document.getElementById("hint3a").onclick = () => { document.getElementById("hintText3").innerHTML = `<div class="hint-text">SELECTの後ろには、表示したい列名を書きます。</div>`; };
+      document.getElementById("hint3b").onclick = () => { document.getElementById("hintText3").innerHTML = `<div class="hint-text">表示したい列名は <strong>student_name</strong> です。</div>`; };
+      document.getElementById("resetSql3").onclick = () => { state.sql[3] = "SELECT ________\nFROM students;"; renderStep3(); bindNavButtons(); };
+      document.getElementById("run3").onclick = () => {
+        state.sql[3] = editor.value;
+        const result = runLearningSql(state.sql[3]);
+        if (!result.ok) {
+          renderStep3(null, `<div class="feedback error">${esc(result.message)}</div>`); bindNavButtons(); return;
+        }
+        const names = result.rows.map(r => r[0]);
+        const ok = result.columns.length === 1 && result.columns[0] === "student_name" && result.rows.length === 4 && ["佐藤","鈴木","高橋","伊藤"].every(n => names.includes(n));
+        if (ok) {
+          state.success[3] = true;
+          renderStep3(result, `<div class="feedback success"><strong>成功！</strong> 必要な列だけを取り出す操作を <strong>「射影」</strong> といいます。</div>`); bindNavButtons();
+        } else {
+          renderStep3(result, `<div class="feedback warn">student_name列だけが4件表示されるように、SQLを見直してください。</div>`); bindNavButtons();
+        }
+      };
+    }
+
+    function renderStep4(lastResult = null, feedback = "") {
+      content.innerHTML = `
+        <section class="panel">
+          <div class="step-title-row"><span class="step-badge">STEP 4</span><h2>条件に合う「行」を取り出す：選択</h2></div>
+          <p class="lead">問題：2Aの生徒だけを表示してください。</p>
+
+          <div class="feedback warn" style="margin-top:0;">SQLの <strong>SELECT</strong> という命令と、関係データベースの <strong>「選択」</strong> は別の意味です。<br>射影＝SELECTで列を指定 ／ 選択＝WHEREで行を絞る</div>
+
+          <div class="sql-layout" style="margin-top:16px">
+            <div>
+              <h3>SQLを入力</h3>
+              <textarea class="sql-editor" id="sql4" spellcheck="false">${esc(state.sql[4])}</textarea>
+              <div class="hint-stack">
+                <button class="btn btn-ghost" type="button" id="hint4a">ヒント</button>
+                <button class="btn btn-secondary" type="button" id="resetSql4">最初の形に戻す</button>
+              </div>
+              <div id="hintText4"></div>
+              <div style="margin-top:12px"><button class="btn btn-primary" type="button" id="run4">SQLを実行</button></div>
+              ${feedback}
+            </div>
+            <div>
+              <h3>参考：students表</h3>
+              ${miniTable(DATA.students, [
+                {key:"student_id",label:"student_id"}, {key:"student_name",label:"student_name"}, {key:"class",label:"class"}
+              ])}
+            </div>
+          </div>
+          <div class="result-box"><h3>実行結果</h3>${renderResult(lastResult)}</div>
+
+          <div class="actions">
+            ${backButtonHtml(4)}
+            <div class="actions-right">${nextButtonHtml(4, "STEP 5へ")}</div>
+          </div>
+        </section>`;
+
+      const editor = document.getElementById("sql4");
+      editor.addEventListener("input", () => { state.sql[4] = editor.value; });
+      document.getElementById("hint4a").onclick = () => { document.getElementById("hintText4").innerHTML = `<div class="hint-text">WHEREは条件に合う行を絞るときに使います。文字は <strong>'2A'</strong> のように ' ' で囲みます。</div>`; };
+      document.getElementById("resetSql4").onclick = () => { state.sql[4] = "SELECT student_name, class\nFROM students\nWHERE class = '____';"; renderStep4(); bindNavButtons(); };
+      document.getElementById("run4").onclick = () => {
+        state.sql[4] = editor.value;
+        const result = runLearningSql(state.sql[4]);
+        if (!result.ok) { renderStep4(null, `<div class="feedback error">${esc(result.message)}</div>`); bindNavButtons(); return; }
+        const nameIdx = result.columns.indexOf("student_name");
+        const names = nameIdx >= 0 ? result.rows.map(r => r[nameIdx]) : [];
+        const ok = result.rows.length === 2 && names.includes("佐藤") && names.includes("鈴木");
+        if (ok) {
+          state.success[4] = true;
+          renderStep4(result, `<div class="feedback success"><strong>成功！</strong> 条件に合う行を取り出す操作を <strong>「選択」</strong> といいます。</div>`); bindNavButtons();
+        } else {
+          renderStep4(result, `<div class="feedback warn">2Aの生徒が佐藤・鈴木の2件だけ表示されるように、条件を確認してください。</div>`); bindNavButtons();
+        }
+      };
+    }
+
+    function renderStep5() {
+      const doneA = state.answers.step5a === "佐藤";
+      const doneB = state.answers.step5b === "SQL入門";
+      content.innerHTML = `
+        <section class="panel">
+          <div class="step-title-row"><span class="step-badge">STEP 5</span><h2>IDをたどって情報をつなぐ：結合</h2></div>
+          <p class="lead">貸出記録 <strong>S01 / B02</strong> から、「誰が」「どの本を」借りたのか調べます。このSTEPではSQLを書きません。</p>
+
+          <div class="relation-grid">
+            <div class="relation-card"><strong>students</strong><div class="relation-main">S01 → ？</div><div class="relation-sub">誰なのか調べる</div></div>
+            <div class="relation-arrow">←</div>
+            <div class="relation-card"><strong>loans</strong><div class="relation-main">S01 / B02</div><div class="relation-sub">貸出の記録</div></div>
+            <div class="relation-arrow">→</div>
+            <div class="relation-card"><strong>books</strong><div class="relation-main">B02 → ？</div><div class="relation-sub">どの本か調べる</div></div>
+          </div>
+
+          <div class="question-box">
+            <div class="question-title">問題1：S01は誰ですか？</div>
+            <div class="choices">
+              ${["佐藤","鈴木","高橋"].map(v => `<label class="choice"><input type="radio" name="q5a" value="${v}" ${state.answers.step5a === v ? "checked" : ""}> ${v}</label>`).join("")}
+            </div>
+            ${doneA ? `<div class="feedback success">正解：S01 → 佐藤</div>` : ""}
+          </div>
+
+          <div class="question-box">
+            <div class="question-title">問題2：B02はどの本ですか？</div>
+            <div class="choices">
+              ${["データベース入門","SQL入門","情報システム基礎"].map(v => `<label class="choice"><input type="radio" name="q5b" value="${v}" ${state.answers.step5b === v ? "checked" : ""}> ${v}</label>`).join("")}
+            </div>
+            ${doneB ? `<div class="feedback success">正解：B02 → SQL入門</div>` : ""}
+          </div>
+
+          <div style="margin-top:14px"><button class="btn btn-primary" id="checkStep5" type="button">2問を確認する</button></div>
+
+          ${state.success[5] ? `
+            <div class="feedback success" style="margin-top:16px">
+              <strong>S01 → 佐藤</strong><br>
+              <strong>B02 → SQL入門</strong><br><br>
+              したがって「佐藤さんがSQL入門を借りた」と分かります。<br>
+              このように、複数の表の情報を共通する値（ID）を使ってつなげることを <strong>「結合」</strong> といいます。
+            </div>` : ""}
+
+          <details>
+            <summary>表を見て確かめる</summary>
+            <div class="details-inner">
+              <h3>students</h3>
+              ${miniTable(DATA.students, [
+                {key:"student_id",label:"student_id"}, {key:"student_name",label:"student_name"}
+              ])}
+              <h3 style="margin-top:14px">books</h3>
+              ${miniTable(DATA.books, [
+                {key:"book_id",label:"book_id"}, {key:"title",label:"title"}
+              ])}
+            </div>
+          </details>
+
+          <div class="actions">
+            ${backButtonHtml(5)}
+            <div class="actions-right">${nextButtonHtml(5, "STEP 6へ")}</div>
+          </div>
+        </section>`;
+
+      document.getElementById("checkStep5").onclick = () => {
+        const a = content.querySelector('input[name="q5a"]:checked');
+        const b = content.querySelector('input[name="q5b"]:checked');
+        if (!a || !b) { showModal("2問とも答えてください", "問題1と問題2の両方を選んでから確認してください。"); return; }
+        state.answers.step5a = a.value;
+        state.answers.step5b = b.value;
+        if (a.value === "佐藤" && b.value === "SQL入門") {
+          state.success[5] = true;
+          renderStep5(); bindNavButtons();
+        } else {
+          renderStep5(); bindNavButtons();
+          showModal("もう一度確認", "S01はstudents表、B02はbooks表で探してみましょう。");
+        }
+      };
+    }
+
+    function getFinalHintHtml() {
+      if (state.hintLevel6 === 0) return "";
+      const hints = [
+        "必要な列は student_name です。",
+        "表は students です。",
+        "WHERE class = '2B' を使います。",
+        "SELECT student_name\nFROM students\nWHERE class = '2B';"
+      ];
+      const label = state.hintLevel6 >= 4 ? "答え" : `ヒント${state.hintLevel6}`;
+      return `<div class="hint-text"><strong>${label}</strong><br><span style="white-space:pre-line">${esc(hints[state.hintLevel6 - 1])}</span></div>`;
+    }
+
+    function renderStep6(lastResult = null, feedback = "") {
+      content.innerHTML = `
+        <section class="panel">
+          <div class="step-title-row"><span class="step-badge">STEP 6</span><h2>Final Mission：射影＋選択</h2></div>
+          <p class="lead"><strong>2Bの生徒について、生徒名だけを表示してください。</strong></p>
+
+          <div class="guide-grid" style="margin-bottom:16px">
+            <div class="guide-card"><span class="guide-label">表示する列</span><p class="guide-text"><strong>student_name</strong></p></div>
+            <div class="guide-card"><span class="guide-label">条件</span><p class="guide-text"><strong>class = '2B'</strong></p></div>
+            <div class="guide-card"><span class="guide-label">使うSQL</span><p class="guide-text"><strong>SELECT / FROM / WHERE</strong></p></div>
+            <div class="guide-card"><span class="guide-label">成功条件</span><p class="guide-text"><strong>高橋・伊藤の2件</strong></p></div>
+          </div>
+
+          <div class="sql-layout">
+            <div>
+              <h3>SQLを自分で作る</h3>
+              <textarea class="sql-editor" id="sql6" spellcheck="false" placeholder="SELECT ...\nFROM ...\nWHERE ...;">${esc(state.sql[6])}</textarea>
+              <div class="hint-stack">
+                <button class="btn btn-ghost" type="button" id="nextHint6">${state.hintLevel6 >= 3 ? "答えを見る" : "ヒントを見る"}</button>
+                <button class="btn btn-secondary" type="button" id="clearSql6">入力を消す</button>
+              </div>
+              <div id="finalHint">${getFinalHintHtml()}</div>
+              <div style="margin-top:12px"><button class="btn btn-primary" type="button" id="run6">SQLを実行</button></div>
+              ${feedback}
+            </div>
+            <div>
+              <h3>参考：students表</h3>
+              ${miniTable(DATA.students, [
+                {key:"student_id",label:"student_id"}, {key:"student_name",label:"student_name"}, {key:"class",label:"class"}
+              ])}
+            </div>
+          </div>
+          <div class="result-box"><h3>実行結果</h3>${renderResult(lastResult)}</div>
+
+          ${state.success[6] ? completionHtml() : ""}
+
+          <div class="actions">
+            ${backButtonHtml(6)}
+          </div>
+        </section>`;
+
+      const editor = document.getElementById("sql6");
+      editor.addEventListener("input", () => { state.sql[6] = editor.value; });
+      document.getElementById("clearSql6").onclick = () => { state.sql[6] = ""; renderStep6(); bindNavButtons(); };
+      document.getElementById("nextHint6").onclick = () => {
+        state.hintLevel6 = Math.min(4, state.hintLevel6 + 1);
+        renderStep6(lastResult, feedback); bindNavButtons();
+      };
+      document.getElementById("run6").onclick = () => {
+        state.sql[6] = editor.value;
+        const result = runLearningSql(state.sql[6]);
+        if (!result.ok) { renderStep6(null, `<div class="feedback error">${esc(result.message)}</div>`); bindNavButtons(); return; }
+        const names = result.rows.map(r => r[0]);
+        const ok = result.columns.length === 1 && result.columns[0] === "student_name" && result.rows.length === 2 && names.includes("高橋") && names.includes("伊藤");
+        if (ok) {
+          state.success[6] = true;
+          if (!state.completionTime) state.completionTime = new Date();
+          renderStep6(result, `<div class="feedback success"><strong>成功！</strong><br>SELECT student_name で列を指定した＝<strong>射影</strong><br>WHERE class = '2B' で行を絞った＝<strong>選択</strong></div>`); bindNavButtons(); bindCompletionButtons();
+        } else {
+          renderStep6(result, `<div class="feedback warn">student_name列だけに、高橋・伊藤の2件が表示されるようにSQLを確認してください。</div>`); bindNavButtons();
+        }
+      };
+      if (state.success[6]) bindCompletionButtons();
+    }
+
+    function completionHtml() {
+      return `
+        <div class="panel complete-card" style="margin-top:20px">
+          <div class="complete-mark">✓</div>
+          <h2>全STEP完了</h2>
+          <p>最後に6つの用語を短く確認して、提出用画面を表示しましょう。</p>
+          <div class="step-checks">
+            <div class="step-check">STEP 1<br>✓</div><div class="step-check">STEP 2<br>✓</div><div class="step-check">STEP 3<br>✓</div>
+            <div class="step-check">STEP 4<br>✓</div><div class="step-check">STEP 5<br>✓</div><div class="step-check">STEP 6<br>✓</div>
+          </div>
+          <div class="term-grid">
+            <div class="term-card"><strong>関係データベース</strong><span>表をIDなどで関連付けて管理</span></div>
+            <div class="term-card"><strong>正規化</strong><span>重複を減らすために表を整理</span></div>
+            <div class="term-card"><strong>SQL</strong><span>取り出したいデータをデータベースに伝える言語</span></div>
+            <div class="term-card"><strong>射影</strong><span>必要な列を取り出す</span></div>
+            <div class="term-card"><strong>選択</strong><span>条件に合う行を取り出す</span></div>
+            <div class="term-card"><strong>結合</strong><span>複数の表の情報を共通する値でつなぐ</span></div>
+          </div>
+          <p style="margin-top:16px;font-weight:800;color:#344054;">正規化で表を整理し、IDで表の情報をつなぎ、射影・選択で必要なデータを取り出す。そのためにSQLを使います。</p>
+          <div class="actions-right" style="justify-content:center;margin:16px 0 0">
+            <button class="btn btn-primary" id="showSubmit" type="button">提出用画面を表示</button>
+          </div>
+        </div>`;
+    }
+
+    function bindCompletionButtons() {
+      const showBtn = document.getElementById("showSubmit");
+      if (!showBtn) return;
+      showBtn.onclick = () => {
+        if (!state.success.slice(1).every(Boolean)) {
+          showModal("まだ完了していません", "すべてのSTEPを成功させてから提出用画面を表示してください。");
+          return;
+        }
+        const d = state.completionTime || new Date();
+        document.getElementById("completionTime").textContent = `完了日時：${d.toLocaleString("ja-JP")}`;
+        const screen = document.getElementById("submitScreen");
+        screen.style.display = "flex";
+        screen.setAttribute("aria-hidden", "false");
+      };
+    }
+
+    document.getElementById("closeSubmitScreen").onclick = () => {
+      const screen = document.getElementById("submitScreen");
+      screen.style.display = "none";
+      screen.setAttribute("aria-hidden", "true");
+    };
+
+    document.getElementById("resetBtn").onclick = () => {
+      showModal("最初からやり直しますか？", "進行状況と入力したSQLをすべて初期状態に戻します。", {
+        confirm: true,
+        confirmLabel: "やり直す",
+        onConfirm: () => {
+          state.currentStep = 1;
+          state.success = [false, false, false, false, false, false, false];
+          state.answers = { step1: null, step2: null, step5a: null, step5b: null };
+          state.sql = {
+            3: "SELECT ________\nFROM students;",
+            4: "SELECT student_name, class\nFROM students\nWHERE class = '____';",
+            6: ""
+          };
+          state.hintLevel6 = 0;
+          state.completionTime = null;
+          updateHeaderAndGuides();
+          renderCurrentStep();
+        }
+      });
+    };
+
+    // 初期表示
+    updateHeaderAndGuides();
+    renderCurrentStep();
+  </script>
+</body>
+</html>
